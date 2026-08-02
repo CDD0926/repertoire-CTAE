@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Répertoire Fax — Estrie</title>
+
+<!-- Firebase (compat SDK, simple à utiliser sans build tools) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#12141a;
+  --surface:#1b1f27;
+  --surface-2:#232838;
+  --border:#2c313d;
+  --text:#e7e9ee;
+  --text-muted:#8b93a3;
+  --amber:#e3a857;
+  --amber-dim:#4a3a22;
+  --teal:#4fb3a9;
+  --teal-dim:#1e3937;
+  --danger:#d9534f;
+  --radius:10px;
+  --font-mono:'IBM Plex Mono', 'Courier New', monospace;
+  --font-sans:'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; background:var(--bg); }
+
+.repfax{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-sans);
+  min-height:100vh;
+  max-width:720px;
+  margin:0 auto;
+  padding-bottom:90px;
+}
+
+.repfax .topbar{
+  position:sticky;
+  top:0;
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+  padding:16px 14px 12px;
+  z-index:10;
+}
+.repfax .title{
+  font-family:var(--font-mono);
+  font-size:1.02rem;
+  letter-spacing:0.5px;
+  color:var(--amber);
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin:0;
+}
+.repfax .cursor{ animation:repfax-blink 1s steps(2) infinite; }
+@keyframes repfax-blink{ 50%{ opacity:0; } }
+.repfax .subtitle{
+  font-size:0.75rem;
+  color:var(--text-muted);
+  margin:3px 0 12px;
+}
+
+.repfax .tabbar{
+  display:flex;
+  gap:6px;
+  overflow-x:auto;
+  padding-bottom:8px;
+  margin-bottom:10px;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.repfax .tabbar::-webkit-scrollbar{ display:none; }
+.repfax .tab-btn{
+  flex:0 0 auto;
+  background:var(--surface);
+  border:1px solid var(--border);
+  color:var(--text-muted);
+  padding:9px 13px;
+  border-radius:8px;
+  font-family:var(--font-mono);
+  font-size:0.74rem;
+  white-space:nowrap;
+  cursor:pointer;
+}
+.repfax .tab-btn.active{
+  background:var(--teal-dim);
+  border-color:var(--teal);
+  color:var(--teal);
+}
+
+.repfax .search-input{
+  width:100%;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:12px 14px;
+  color:var(--text);
+  font-size:1rem;
+  font-family:var(--font-sans);
+}
+.repfax .search-input:focus{ outline:2px solid var(--teal); outline-offset:1px; }
+.repfax .search-input::placeholder{ color:var(--text-muted); }
+
+.repfax .status-line{
+  padding:10px 16px;
+  font-size:0.8rem;
+  color:var(--text-muted);
+  font-family:var(--font-mono);
+}
+.repfax .status-line.err{ color:var(--danger); }
+.repfax .status-line.ok{ color:var(--teal); }
+
+.repfax .section-card{
+  margin:12px;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:var(--surface);
+  overflow:hidden;
+}
+.repfax .section-empty{
+  padding:22px 16px;
+  text-align:center;
+  color:var(--text-muted);
+  font-size:0.85rem;
+  line-height:1.5;
+}
+.repfax .section-empty .big{
+  font-family:var(--font-mono);
+  color:var(--amber);
+  font-size:0.9rem;
+  display:block;
+  margin-bottom:6px;
+}
+
+.repfax .entry-card{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  padding:12px 16px;
+  border-bottom:1px solid var(--border);
+}
+.repfax .entry-card:last-child{ border-bottom:none; }
+.repfax .entry-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
+.repfax .entry-title{ font-size:0.92rem; font-weight:600; color:var(--text); word-break:break-word; }
+.repfax .entry-meta{ font-size:0.76rem; color:var(--text-muted); }
+.repfax .value-row{ display:flex; flex-wrap:wrap; gap:14px; margin-top:2px; }
+.repfax .value-chip{ display:flex; flex-direction:column; cursor:pointer; background:none; border:none; text-align:left; padding:0; color:var(--text); }
+.repfax .value-chip .vlabel{ font-family:var(--font-mono); font-size:0.58rem; color:var(--text-muted); letter-spacing:0.5px; margin-bottom:2px; }
+.repfax .value-chip .vvalue{ font-family:var(--font-mono); font-size:1.05rem; color:var(--teal); letter-spacing:0.3px; word-break:break-all; }
+.repfax .value-chip .vvalue.empty{ color:var(--text-muted); font-style:italic; font-size:0.8rem; }
+.repfax .entry-notes{ font-size:0.75rem; color:var(--text-muted); font-style:italic; }
+
+.repfax .icon-btn{
+  background:none;
+  border:1px solid var(--border);
+  color:var(--text-muted);
+  width:32px;
+  height:32px;
+  min-width:32px;
+  border-radius:8px;
+  font-size:0.9rem;
+  flex-shrink:0;
+  font-family:var(--font-sans);
+}
+.repfax .icon-btn.danger.confirming{
+  background:var(--danger);
+  color:#fff;
+  border-color:var(--danger);
+  font-size:0.6rem;
+  width:auto;
+  padding:0 8px;
+}
+.repfax .entry-actions{ display:flex; gap:6px; flex-shrink:0; }
+
+.repfax .inline-form{
+  padding:14px 16px;
+  background:var(--surface-2);
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.repfax .inline-form label{
+  font-size:0.68rem;
+  color:var(--text-muted);
+  font-family:var(--font-mono);
+  margin-bottom:-4px;
+}
+.repfax .inline-form input{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:9px 10px;
+  color:var(--text);
+  font-size:0.9rem;
+  font-family:var(--font-sans);
+  width:100%;
+}
+.repfax .inline-form .btnrow{ display:flex; gap:8px; margin-top:4px; }
+.repfax .btn{
+  border:none;
+  border-radius:8px;
+  padding:9px 14px;
+  font-size:0.85rem;
+  font-weight:600;
+  font-family:var(--font-sans);
+  cursor:pointer;
+}
+.repfax .btn.primary{ background:var(--teal); color:#0c1a19; }
+.repfax .btn.ghost{ background:none; color:var(--text-muted); border:1px solid var(--border); }
+
+.repfax .add-entry-btn{
+  width:100%;
+  border:1px dashed var(--border);
+  background:none;
+  color:var(--text-muted);
+  padding:12px;
+  font-size:0.8rem;
+  font-family:var(--font-mono);
+  cursor:pointer;
+}
+.repfax .add-entry-btn:hover{ color:var(--teal); border-color:var(--teal); }
+
+.repfax .footer-hint{
+  padding:16px 20px 0;
+  font-size:0.72rem;
+  color:var(--text-muted);
+  text-align:center;
+  line-height:1.5;
+}
+
+.repfax .toast{
+  position:fixed;
+  bottom:18px;
+  left:50%;
+  transform:translateX(-50%) translateY(8px);
+  background:var(--surface-2);
+  border:1px solid var(--teal);
+  color:var(--text);
+  padding:10px 16px;
+  border-radius:8px;
+  font-size:0.82rem;
+  font-family:var(--font-mono);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .18s ease, transform .18s ease;
+  z-index:50;
+  max-width:85%;
+  text-align:center;
+}
+.repfax .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="repfax" id="repfax-root">
+  <div class="topbar">
+    <p class="title"><span class="cursor">█</span> REPERTOIRE_FAX.SYS</p>
+    <p class="subtitle">Fax, codes d'entrée, codes établissement et codes géographiques — réseau Estrie et hors-région</p>
+    <div class="tabbar" id="tabbar"></div>
+    <input class="search-input" id="search-input" type="text" placeholder="Chercher dans cet onglet..." autocomplete="off" />
+  </div>
+  <div id="status-area"></div>
+  <main id="section-container"></main>
+  <p class="footer-hint">Tape sur une valeur pour la copier. ✎ pour corriger, ✕ pour supprimer, + pour ajouter une ligne. Liste partagée en temps réel : tes collègues voient tes ajouts et corrections dès qu'ils les font, et toi les leurs.</p>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  // ---- CONFIG FIREBASE ----
+  var firebaseConfig = {
+    apiKey: "AIzaSyCssyStQ4qZx4Q_AFwMkdGQBJproI9D5HI",
+    authDomain: "repertoiredescodes.firebaseapp.com",
+    projectId: "repertoiredescodes",
+    storageBucket: "repertoiredescodes.firebasestorage.app",
+    messagingSenderId: "350692072069",
+    appId: "1:350692072069:web:a32faff0ad66178ea5a7ec"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.firestore();
+  var docRef = db.collection('repertoireFax').doc('main');
+
+  var SEED_SECTIONS = [
+  {
+    "id": "fax",
+    "label": "FAX",
+    "columns": [
+      { "key": "site", "label": "Site", "role": "title" },
+      { "key": "unit", "label": "Étage / Unité", "role": "meta" },
+      { "key": "value", "label": "Fax", "role": "value" },
+      { "key": "notes", "label": "Notes", "role": "notes" }
+    ],
+    "entries": [
+      { "id": "e1", "site": "Fleurimont", "unit": "3e Hémo", "value": "819-829-6469", "notes": "" },
+      { "id": "e2", "site": "Fleurimont", "unit": "3e soins coro", "value": "819-564-5245", "notes": "" },
+      { "id": "e3", "site": "Fleurimont", "unit": "3e SI", "value": "819-829-3242", "notes": "" },
+      { "id": "e4", "site": "Fleurimont", "unit": "3e bloc", "value": "819-820-6470", "notes": "" },
+      { "id": "e5", "site": "Fleurimont", "unit": "4e B", "value": "819-820-6481", "notes": "" },
+      { "id": "e6", "site": "Fleurimont", "unit": "Maternité", "value": "819-820-6441", "notes": "" },
+      { "id": "e7", "site": "Fleurimont", "unit": "Néonat", "value": "819-820-6477", "notes": "" },
+      { "id": "e8", "site": "Fleurimont", "unit": "Ped", "value": "819-820-6482", "notes": "" },
+      { "id": "e9", "site": "Fleurimont", "unit": "Chx 1 jour 6e", "value": "819-829-3251", "notes": "" },
+      { "id": "e10", "site": "Fleurimont", "unit": "6e A", "value": "819-820-6460", "notes": "" },
+      { "id": "e11", "site": "Fleurimont", "unit": "6e C", "value": "819-829-3259", "notes": "" },
+      { "id": "e12", "site": "Fleurimont", "unit": "9e SI", "value": "819-829-3243", "notes": "" },
+      { "id": "e13", "site": "Fleurimont", "unit": "10e", "value": "819-829-3234", "notes": "" },
+      { "id": "e14", "site": "Hôtel-Dieu (HD)", "unit": "Poste 300", "value": "819-829-6270", "notes": "" },
+      { "id": "e15", "site": "Hôtel-Dieu (HD)", "unit": "3e SI", "value": "819-822-6787", "notes": "" },
+      { "id": "e16", "site": "Hôtel-Dieu (HD)", "unit": "3e C", "value": "819-829-6269", "notes": "" },
+      { "id": "e17", "site": "Hôtel-Dieu (HD)", "unit": "4C", "value": "819-829-6271", "notes": "" },
+      { "id": "e18", "site": "Hôtel-Dieu (HD)", "unit": "5C", "value": "819-829-6268", "notes": "" },
+      { "id": "e19", "site": "Hôtel-Dieu (HD)", "unit": "6C", "value": "819-829-6292", "notes": "" },
+      { "id": "e20", "site": "Hôtel-Dieu (HD)", "unit": "Soins Pal", "value": "819-829-6277", "notes": "" },
+      { "id": "e21", "site": "Drummondville", "unit": "Néonat (2e)", "value": "819-478-6402", "notes": "" },
+      { "id": "e22", "site": "Drummondville", "unit": "Ped (2e)", "value": "819-478-6416", "notes": "" },
+      { "id": "e23", "site": "Drummondville", "unit": "SI (4e)", "value": "819-478-6463", "notes": "" },
+      { "id": "e24", "site": "Drummondville", "unit": "Psy (7e)", "value": "819-478-5093", "notes": "" },
+      { "id": "e25", "site": "Victoriaville", "unit": "Maternité (4e)", "value": "", "notes": "à compléter" },
+      { "id": "e26", "site": "Victoriaville", "unit": "SI", "value": "819-357-6017", "notes": "" },
+      { "id": "e27", "site": "Granby", "unit": "Néonat (2e)", "value": "450-375-8036", "notes": "" },
+      { "id": "e28", "site": "Granby", "unit": "SI (2e)", "value": "450-375-8011", "notes": "" },
+      { "id": "e29", "site": "Cowansville", "unit": "Néonat", "value": "", "notes": "à compléter" },
+      { "id": "e30", "site": "Cowansville", "unit": "SI", "value": "450-266-5577", "notes": "" },
+      { "id": "e31", "site": "Thetford Mines", "unit": "SI", "value": "418-338-7758", "notes": "" },
+      { "id": "e32", "site": "St-Hyacinthe", "unit": "Néonat", "value": "450-771-3527", "notes": "" },
+      { "id": "e33", "site": "Children's / CUSM", "unit": "Urgence", "value": "514-412-4219", "notes": "" },
+      { "id": "e34", "site": "Children's / CUSM", "unit": "NICU (6e)", "value": "514-938-7675", "notes": "" },
+      { "id": "e35", "site": "Children's / CUSM", "unit": "Neurochir ped (8e)", "value": "514-412-4267", "notes": "" },
+      { "id": "e36", "site": "CHUL", "unit": "Mère-enfant", "value": "418-577-2051", "notes": "" },
+      { "id": "e37", "site": "CHU Sainte-Justine", "unit": "6e", "value": "", "notes": "à compléter" }
+    ]
+  },
+  {
+    "id": "code_entree",
+    "label": "Code d'entrée",
+    "columns": [
+      { "key": "site", "label": "Site", "role": "title" },
+      { "key": "desc", "label": "Description", "role": "meta" },
+      { "key": "value", "label": "Code", "role": "value" },
+      { "key": "notes", "label": "Notes", "role": "notes" }
+    ],
+    "entries": [
+      { "id": "c1", "site": "Victoriaville", "desc": "Porte d'entrée", "value": "4321*", "notes": "" },
+      { "id": "c2", "site": "CHU Sainte-Justine", "desc": "Garage", "value": "6700", "notes": "" }
+    ]
+  },
+  {
+    "id": "code_etablissement",
+    "label": "Code établissement",
+    "columns": [
+      { "key": "etablissement", "label": "Établissement", "role": "title" },
+      { "key": "code_etab", "label": "Code établissement", "role": "value" },
+      { "key": "code_geo", "label": "Code géographique", "role": "value" },
+      { "key": "notes", "label": "Notes", "role": "notes" }
+    ],
+    "entries": [
+      { "id": "et1", "etablissement": "CHUS – Hôpital Fleurimont", "code_etab": "5121-6687", "code_geo": "43027", "notes": "" },
+      { "id": "et2", "etablissement": "CHUS – Hôtel-Dieu", "code_etab": "5121-6695", "code_geo": "43027", "notes": "" },
+      { "id": "et3", "etablissement": "Hôpital et Centre d'hébergement d'Youville", "code_etab": "5121-7974", "code_geo": "43027", "notes": "" },
+      { "id": "et4", "etablissement": "CLSC et Centre serv. amb. Belvédère", "code_etab": "5124-5280", "code_geo": "43027", "notes": "" },
+      { "id": "et5", "etablissement": "Hôpital et Centre d'hébergement Argyll", "code_etab": "5122-7536", "code_geo": "43027", "notes": "" },
+      { "id": "et6", "etablissement": "Centre d'hébergement Saint-Joseph (Sherbrooke)", "code_etab": "5121-9327", "code_geo": "43027", "notes": "" },
+      { "id": "et7", "etablissement": "Centre d'hébergement Saint-Vincent", "code_etab": "5122-6835", "code_geo": "43027", "notes": "" },
+      { "id": "et8", "etablissement": "CLSC de Sherbrooke – King Est", "code_etab": "5122-3444", "code_geo": "43027", "notes": "" },
+      { "id": "et9", "etablissement": "CLSC de Sherbrooke – Speid", "code_etab": "5298-3848", "code_geo": "43027", "notes": "" },
+      { "id": "et10", "etablissement": "CLSC de Sherbrooke – Camirand", "code_etab": "5122-3436", "code_geo": "43027", "notes": "" },
+      { "id": "et11", "etablissement": "CLSC de Sherbrooke – Bourque", "code_etab": "5353-5365", "code_geo": "43027", "notes": "" },
+      { "id": "et12", "etablissement": "CLSC de Sherbrooke – King Ouest", "code_etab": "5122-4467", "code_geo": "43027", "notes": "" },
+      { "id": "et13", "etablissement": "Centre de maternité de l'Estrie", "code_etab": "5123-1355", "code_geo": "43027", "notes": "" },
+      { "id": "et14", "etablissement": "Centre Jean-Patrice-Chiasson", "code_etab": "5122-9243", "code_geo": "43027", "notes": "" },
+      { "id": "et15", "etablissement": "Centre jeunesse de l'Estrie – Val-du-Lac", "code_etab": "5121-7644", "code_geo": "43027", "notes": "" },
+      { "id": "et16", "etablissement": "Centre de réadaptation Estrie inc.", "code_etab": "5518-3370", "code_geo": "43027", "notes": "" },
+      { "id": "et17", "etablissement": "Centre Notre-Dame-de-l'Enfant", "code_etab": "5122-1521", "code_geo": "43027", "notes": "" },
+      { "id": "et18", "etablissement": "CHSLD Vigi Shermont", "code_etab": "5123-0506", "code_geo": "43027", "notes": "vu aussi 1275-2069 sur une autre copie du document — à valider" },
+      { "id": "et19", "etablissement": "Villa Marie-Claire", "code_etab": "5123-4086", "code_geo": "43027", "notes": "vu aussi 1246-9185 sur une autre copie du document — à valider" },
+      { "id": "et20", "etablissement": "Maison Rose Blanche", "code_etab": "5123-3104", "code_geo": "43027", "notes": "" },
+      { "id": "et21", "etablissement": "Maison Aube-Lumière", "code_etab": "6119820", "code_geo": "43027", "notes": "" },
+      { "id": "et22", "etablissement": "CPRJDA de Sherbrooke", "code_etab": "5517-0088", "code_geo": "43027", "notes": "" },
+      { "id": "et23", "etablissement": "CRDP Le Touret", "code_etab": "5122-5308", "code_geo": "43027", "notes": "" },
+      { "id": "et24", "etablissement": "Foyer de groupe et appart. supervisé JDA Kelly", "code_etab": "5122-9649", "code_geo": "43027", "notes": "" },
+      { "id": "et25", "etablissement": "MDA MA de Sherbrooke", "code_etab": "5124-7047", "code_geo": "43027", "notes": "" },
+      { "id": "et26", "etablissement": "CLSC – Centre d'hébergement de Windsor", "code_etab": "5561-7641", "code_geo": "42088", "notes": "" },
+      { "id": "et27", "etablissement": "Centre d'activités de jour sociocom. du Val-St-François", "code_etab": "5123-3211", "code_geo": "42088", "notes": "" },
+      { "id": "et28", "etablissement": "Centre multi. SSS du Val-Saint-François", "code_etab": "5124-8458", "code_geo": "42088", "notes": "" },
+      { "id": "et29", "etablissement": "Hôpital, CLSC et Centre d'hébergement d'Asbestos", "code_etab": "5124-7583", "code_geo": "40043", "notes": "" },
+      { "id": "et30", "etablissement": "CPRJDA des Sources", "code_etab": "5149-6438", "code_geo": "40043", "notes": "" },
+      { "id": "et31", "etablissement": "CRDP des Sources", "code_etab": "5183-1436", "code_geo": "40043", "notes": "" },
+      { "id": "et32", "etablissement": "Centre d'hébergement de Wotton (CHSLD)", "code_etab": "5536-9144", "code_geo": "40017", "notes": "" },
+      { "id": "et33", "etablissement": "Centre d'hébergement d'East Angus (CHSLD)", "code_etab": "5121-7990", "code_geo": "41060", "notes": "" },
+      { "id": "et34", "etablissement": "CLSC d'East Angus", "code_etab": "5124-7591", "code_geo": "41060", "notes": "" },
+      { "id": "et35", "etablissement": "CLSC de Cookshire", "code_etab": "5176-9644", "code_geo": "41038", "notes": "" },
+      { "id": "et36", "etablissement": "Point de service de Magog", "code_etab": "5122-7452", "code_geo": "45072", "notes": "" },
+      { "id": "et37", "etablissement": "CLSC de Magog", "code_etab": "5124-6262", "code_geo": "45072", "notes": "" },
+      { "id": "et38", "etablissement": "CPRJDA de Memphrémagog", "code_etab": "5123-4094", "code_geo": "45072", "notes": "" },
+      { "id": "et39", "etablissement": "CSSS de Memphrémagog – Point de service de Stanstead (CLSC)", "code_etab": "5333-2847", "code_geo": "45008", "notes": "" },
+      { "id": "et40", "etablissement": "CSSS de la MRC-de-Coaticook", "code_etab": "5124-7617", "code_geo": "44037", "notes": "" },
+      { "id": "et41", "etablissement": "CRDP de Coaticook", "code_etab": "5122-5324", "code_geo": "44037", "notes": "" },
+      { "id": "et42", "etablissement": "Centre d'activités de jour de Dixville inc.", "code_etab": "5454-7393", "code_geo": "44023", "notes": "" },
+      { "id": "et43", "etablissement": "CLSC de la Patrie", "code_etab": "5176-9636", "code_geo": "41027", "notes": "" },
+      { "id": "et44", "etablissement": "CLSC de Richmond", "code_etab": "5121-9319", "code_geo": "42098", "notes": "" },
+      { "id": "et45", "etablissement": "Centre d'hébergement de Richmond (CHSLD)", "code_etab": "5561-7666", "code_geo": "42098", "notes": "" },
+      { "id": "et46", "etablissement": "CHSLD Wales", "code_etab": "5123-2148", "code_geo": "42110", "notes": "" },
+      { "id": "et47", "etablissement": "Centre d'hébergement de Weedon (CHSLD)", "code_etab": "5121-8006", "code_geo": "41098", "notes": "" },
+      { "id": "et48", "etablissement": "CLSC de Weedon", "code_etab": "5121-9251", "code_geo": "41098", "notes": "" },
+      { "id": "et49", "etablissement": "Point de service de Lac-Mégantic", "code_etab": "5122-7437", "code_geo": "30030", "notes": "" },
+      { "id": "et50", "etablissement": "CSSS du Granit – Point de service de Lac-Mégantic (CHSLD)", "code_etab": "5122-3857", "code_geo": "30030", "notes": "" },
+      { "id": "et51", "etablissement": "CSSS du Granit – Point de service de Saint-Ludger (CLSC)", "code_etab": "5458-3794", "code_geo": "30072", "notes": "" },
+      { "id": "et52", "etablissement": "CRDP et CPRJDA du Granit", "code_etab": "5124-7633", "code_geo": "30030", "notes": "" },
+      { "id": "et53", "etablissement": "CLSC – Centre d'hébergement de Valcourt (CHSLD)", "code_etab": "5561-7658", "code_geo": "42060", "notes": "" },
+      { "id": "et54", "etablissement": "CSSS de Memphrémagog – Point de service de Potton (CLSC)", "code_etab": "5517-4510", "code_geo": "45030", "notes": "" },
+      { "id": "et55", "etablissement": "CSSS du Granit – Point de service de Lambton (CLSC, CHSLD)", "code_etab": "5317-4454", "code_geo": "42055", "notes": "" },
+      { "id": "et56", "etablissement": "Hôpital de Granby", "code_etab": "5122-8120", "code_geo": "47017", "notes": "" },
+      { "id": "et57", "etablissement": "Centre hospitalier régional de Rimouski", "code_etab": "5122-7882", "code_geo": "10043", "notes": "hors-région" },
+      { "id": "et58", "etablissement": "Hôtel-Dieu de Roberval", "code_etab": "5122-8203", "code_geo": "91025", "notes": "hors-région" },
+      { "id": "et59", "etablissement": "Hôpital de Chicoutimi", "code_etab": "5121-8394", "code_geo": "94050", "notes": "hors-région" },
+      { "id": "et60", "etablissement": "Hôpital de l'Enfant-Jésus (Québec)", "code_etab": "1316-3092", "code_geo": "23027", "notes": "hors-région" },
+      { "id": "et61", "etablissement": "Hôpital du Saint-Sacrement (Québec)", "code_etab": "5121-7529", "code_geo": "23027", "notes": "hors-région" },
+      { "id": "et62", "etablissement": "Hôpital Saint-François-D'Assise (Québec)", "code_etab": "5121-7602", "code_geo": "23027", "notes": "hors-région" },
+      { "id": "et63", "etablissement": "Hôtel-Dieu de Québec", "code_etab": "5121-7586", "code_geo": "23027", "notes": "hors-région" },
+      { "id": "et64", "etablissement": "Pavillon CHU de l'Université Laval (Sainte-Foy)", "code_etab": "5121-7594", "code_geo": "23027", "notes": "hors-région" },
+      { "id": "et65", "etablissement": "Hôtel-Dieu de Lévis", "code_etab": "1159-1419", "code_geo": "24020", "notes": "hors-région" },
+      { "id": "et66", "etablissement": "Hôpital et Centre d'hébergement Saint-Joseph (Thetford Mines)", "code_etab": "5122-8948", "code_geo": "31084", "notes": "hors-région" },
+      { "id": "et67", "etablissement": "Centre hospitalier Beauce-Etchemin (Saint-Georges)", "code_etab": "5122-8971", "code_geo": "29073", "notes": "hors-région" },
+      { "id": "et68", "etablissement": "Hôpital Sainte-Croix (Drummondville)", "code_etab": "5122-8781", "code_geo": "49058", "notes": "hors-région" },
+      { "id": "et69", "etablissement": "Hôtel-Dieu d'Arthabaska (Victoriaville)", "code_etab": "5122-8039", "code_geo": "39062", "notes": "hors-région" },
+      { "id": "et70", "etablissement": "CHR Trois-Rivières – Pavillon Saint-Joseph", "code_etab": "5122-0150", "code_geo": "37067", "notes": "hors-région" },
+      { "id": "et71", "etablissement": "CHR Trois-Rivières – Pavillon Sainte-Marie", "code_etab": "5122-0168", "code_geo": "37067", "notes": "hors-région" },
+      { "id": "et72", "etablissement": "Centre hospitalier de Verdun", "code_etab": "5121-8097", "code_geo": "66035", "notes": "hors-région" },
+      { "id": "et73", "etablissement": "Centre hospitalier de St-Mary", "code_etab": "1274-5725", "code_geo": "60025", "notes": "hors-région" },
+      { "id": "et74", "etablissement": "Centre hospitalier Fleury", "code_etab": "5122-8492", "code_geo": "60025", "notes": "hors-région" },
+      { "id": "et75", "etablissement": "CHU Sainte-Justine (Montréal)", "code_etab": "5122-2800", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et76", "etablissement": "CHUM – Campus Notre-Dame", "code_etab": "5121-9236", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et77", "etablissement": "CHUM – Hôtel-Dieu", "code_etab": "5121-9228", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et78", "etablissement": "CHUM – Campus St-Luc", "code_etab": "5121-9244", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et79", "etablissement": "Hôpital de Montréal pour enfants", "code_etab": "5122-3279", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et80", "etablissement": "Hôpital Douglas", "code_etab": "1372-7060", "code_geo": "66035", "notes": "hors-région" },
+      { "id": "et81", "etablissement": "Hôpital du Sacré-Cœur de Montréal", "code_etab": "1247-5976", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et82", "etablissement": "Hôpital général de Montréal", "code_etab": "1259-9213", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et83", "etablissement": "Hôpital général juif Sir Mortimer Davis", "code_etab": "1268-5608", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et84", "etablissement": "Hôpital Jean-Talon", "code_etab": "5122-8500", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et85", "etablissement": "Hôpital Louis-H. Lafontaine", "code_etab": "1104-2215", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et86", "etablissement": "Hôpital Maisonneuve-Rosemont", "code_etab": "1293-4659", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et87", "etablissement": "Hôpital Royal-Victoria", "code_etab": "5122-3295", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et88", "etablissement": "Hôpital Sainte-Anne-de-Bellevue", "code_etab": "5152-1425", "code_geo": "66117", "notes": "hors-région" },
+      { "id": "et89", "etablissement": "Hôpital Santa Cabrini", "code_etab": "1242-0774", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et90", "etablissement": "Institut de cardiologie de Montréal", "code_etab": "1243-1656", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et91", "etablissement": "Institut de réadaptation de Montréal", "code_etab": "1281-9348", "code_geo": "66025", "notes": "hors-région" },
+      { "id": "et92", "etablissement": "Cité de la santé de Laval", "code_etab": "5122-8757", "code_geo": "65005", "notes": "hors-région" },
+      { "id": "et93", "etablissement": "Centre hospitalier Le Gardeur (Mascouche)", "code_etab": "5122-8062", "code_geo": "64008", "notes": "hors-région" },
+      { "id": "et94", "etablissement": "Hôpital régional de Saint-Jérôme", "code_etab": "5122-2880", "code_geo": "75017", "notes": "hors-région" },
+      { "id": "et95", "etablissement": "CSSS des Sommets (Sainte-Agathe-des-Monts)", "code_etab": "1104-4013", "code_geo": "78032", "notes": "hors-région" },
+      { "id": "et96", "etablissement": "Centre hospitalier Anna-Laberge (Châteauguay)", "code_etab": "5122-9151", "code_geo": "67050", "notes": "hors-région" },
+      { "id": "et97", "etablissement": "CSSS Haut-Richelieu-Rouville", "code_etab": "1104-4542", "code_geo": "56083", "notes": "hors-région" },
+      { "id": "et98", "etablissement": "Hôpital du Haut-Richelieu", "code_etab": "5122-9045", "code_geo": "56083", "notes": "hors-région" },
+      { "id": "et99", "etablissement": "Hôpital Charles-Lemoyne", "code_etab": "1322-4969", "code_geo": "58015", "notes": "hors-région" },
+      { "id": "et100", "etablissement": "Centre hospitalier Pierre-Boucher", "code_etab": "5122-9011", "code_geo": "58030", "notes": "hors-région" },
+      { "id": "et101", "etablissement": "Hôpital Honoré-Mercier (Saint-Hyacinthe)", "code_etab": "5122-9193", "code_geo": "54048", "notes": "hors-région" },
+      { "id": "et102", "etablissement": "Hôtel-Dieu de Saint-Hyacinthe", "code_etab": "5458-3356", "code_geo": "54048", "notes": "hors-région" },
+      { "id": "et103", "etablissement": "Hôpital Brome-Missisquoi-Perkins (Cowansville)", "code_etab": "5122-9185", "code_geo": "46080", "notes": "hors-région" },
+      { "id": "et104", "etablissement": "Centre hospitalier régional de l'Outaouais (Gatineau)", "code_etab": "5122-1711", "code_geo": "81017", "notes": "hors-région" },
+      { "id": "et105", "etablissement": "Aéroport de Sherbrooke", "code_etab": "6000-0868", "code_geo": "", "notes": "installation, pas un établissement de santé" },
+      { "id": "et106", "etablissement": "Prison de Sherbrooke", "code_etab": "7000-0051", "code_geo": "", "notes": "installation, pas un établissement de santé" }
+    ]
+  },
+  {
+    "id": "code_geo_estrie",
+    "label": "Code géographiques Estrie",
+    "columns": [
+      { "key": "secteur", "label": "Municipalité / secteur", "role": "title" },
+      { "key": "region", "label": "Région administrative / zone", "role": "meta" },
+      { "key": "code_geo", "label": "Code géographique", "role": "value" },
+      { "key": "notes", "label": "Notes", "role": "notes" }
+    ],
+    "entries": [
+      { "id": "g1", "secteur": "Saint-Julien", "region": "501 - Sherbrooke", "code_geo": "31035", "notes": "" },
+      { "id": "g2", "secteur": "Ascot Corner", "region": "501 - Sherbrooke", "code_geo": "41055", "notes": "" },
+      { "id": "g3", "secteur": "Stoke", "region": "501 - Sherbrooke", "code_geo": "42005", "notes": "" },
+      { "id": "g4", "secteur": "Saint-Denis-de-Brompton", "region": "501 - Sherbrooke", "code_geo": "42025", "notes": "" },
+      { "id": "g5", "secteur": "Sherbrooke (Ville)", "region": "501 - Sherbrooke", "code_geo": "43027", "notes": "" },
+      { "id": "g6", "secteur": "Waterville (Ville)", "region": "501 - Sherbrooke", "code_geo": "44080", "notes": "" },
+      { "id": "g7", "secteur": "Saint-François-Xavier-de-Brompton", "region": "502 - Windsor", "code_geo": "42020", "notes": "" },
+      { "id": "g8", "secteur": "Windsor (Ville)", "region": "502 - Windsor", "code_geo": "42088", "notes": "" },
+      { "id": "g9", "secteur": "Val-Joli", "region": "502 - Windsor", "code_geo": "42095", "notes": "" },
+      { "id": "g10", "secteur": "Saint-Claude", "region": "502 - Windsor", "code_geo": "42100", "notes": "" },
+      { "id": "g11", "secteur": "Saint-Adrien", "region": "503 - Val-des-Sources (Asbestos)", "code_geo": "40010", "notes": "" },
+      { "id": "g12", "secteur": "Wotton", "region": "503 - Val-des-Sources (Asbestos)", "code_geo": "40017", "notes": "" },
+      { "id": "g13", "secteur": "Saint-Georges-de-Windsor", "region": "503 - Val-des-Sources (Asbestos)", "code_geo": "40032", "notes": "" },
+      { "id": "g14", "secteur": "Val-des-Sources (Asbestos, Ville)", "region": "503 - Val-des-Sources (Asbestos)", "code_geo": "40043", "notes": "" },
+      { "id": "g15", "secteur": "Danville (Ville)", "region": "503 - Val-des-Sources (Asbestos)", "code_geo": "40047", "notes": "" },
+      { "id": "g16", "secteur": "Cookshire-Eaton (Ville)", "region": "504 - East Angus", "code_geo": "41038", "notes": "" },
+      { "id": "g17", "secteur": "East Angus (Ville)", "region": "504 - East Angus", "code_geo": "41060", "notes": "" },
+      { "id": "g18", "secteur": "Westbury", "region": "505/520 - Magog", "code_geo": "41065", "notes": "" },
+      { "id": "g19", "secteur": "Bury", "region": "505/520 - Magog", "code_geo": "41070", "notes": "" },
+      { "id": "g20", "secteur": "Ayer's Cliff", "region": "505/520 - Magog", "code_geo": "45035", "notes": "" },
+      { "id": "g21", "secteur": "North Hatley", "region": "505/520 - Magog", "code_geo": "45050", "notes": "" },
+      { "id": "g22", "secteur": "Hatley (canton)", "region": "505/520 - Magog", "code_geo": "45055", "notes": "" },
+      { "id": "g23", "secteur": "Sainte-Catherine-de-Hatley", "region": "505/520 - Magog", "code_geo": "45060", "notes": "" },
+      { "id": "g24", "secteur": "Magog (Ville)", "region": "505/520 - Magog", "code_geo": "45072", "notes": "" },
+      { "id": "g25", "secteur": "Orford", "region": "505/520 - Magog", "code_geo": "45115", "notes": "" },
+      { "id": "g26", "secteur": "Stanstead-Est", "region": "506 - Stanstead", "code_geo": "44050", "notes": "" },
+      { "id": "g27", "secteur": "Stanstead (Ville)", "region": "506 - Stanstead", "code_geo": "45008", "notes": "" },
+      { "id": "g28", "secteur": "Ogden", "region": "506 - Stanstead", "code_geo": "45020", "notes": "" },
+      { "id": "g29", "secteur": "Stanstead (canton)", "region": "506 - Stanstead", "code_geo": "45025", "notes": "" },
+      { "id": "g30", "secteur": "Saint-Isidore-de-Clifton", "region": "507 - Coaticook", "code_geo": "41012", "notes": "" },
+      { "id": "g31", "secteur": "Saint-Malo", "region": "507 - Coaticook", "code_geo": "44003", "notes": "" },
+      { "id": "g32", "secteur": "Saint-Venant-de-Paquette", "region": "507 - Coaticook", "code_geo": "44005", "notes": "" },
+      { "id": "g33", "secteur": "East Hereford", "region": "507 - Coaticook", "code_geo": "44010", "notes": "" },
+      { "id": "g34", "secteur": "Saint-Herménégilde", "region": "507 - Coaticook", "code_geo": "44015", "notes": "" },
+      { "id": "g35", "secteur": "Dixville", "region": "507 - Coaticook", "code_geo": "44023", "notes": "" },
+      { "id": "g36", "secteur": "Coaticook (Ville)", "region": "507 - Coaticook", "code_geo": "44037", "notes": "" },
+      { "id": "g37", "secteur": "Barnston-Ouest", "region": "507 - Coaticook", "code_geo": "44045", "notes": "" },
+      { "id": "g38", "secteur": "Sainte-Edwidge-de-Clifton", "region": "507 - Coaticook", "code_geo": "44055", "notes": "" },
+      { "id": "g39", "secteur": "Martinville", "region": "507 - Coaticook", "code_geo": "44060", "notes": "" },
+      { "id": "g40", "secteur": "Compton", "region": "507 - Coaticook", "code_geo": "44071", "notes": "" },
+      { "id": "g41", "secteur": "Hatley (municipalité)", "region": "507 - Coaticook", "code_geo": "45043", "notes": "" },
+      { "id": "g42", "secteur": "Chartierville", "region": "508 - La Patrie", "code_geo": "41020", "notes": "" },
+      { "id": "g43", "secteur": "La Patrie", "region": "508 - La Patrie", "code_geo": "41027", "notes": "" },
+      { "id": "g44", "secteur": "Newport", "region": "508 - La Patrie", "code_geo": "41037", "notes": "" },
+      { "id": "g45", "secteur": "Hampden", "region": "508 - La Patrie", "code_geo": "41075", "notes": "" },
+      { "id": "g46", "secteur": "Scotstown (Ville)", "region": "508 - La Patrie", "code_geo": "41080", "notes": "" },
+      { "id": "g47", "secteur": "Kingsbury", "region": "509 - Richmond", "code_geo": "42070", "notes": "" },
+      { "id": "g48", "secteur": "Melbourne", "region": "509 - Richmond", "code_geo": "42075", "notes": "" },
+      { "id": "g49", "secteur": "Richmond (Ville)", "region": "509 - Richmond", "code_geo": "42098", "notes": "" },
+      { "id": "g50", "secteur": "Cleveland", "region": "509 - Richmond", "code_geo": "42110", "notes": "" },
+      { "id": "g51", "secteur": "Stratford", "region": "510 - Weedon", "code_geo": "30110", "notes": "" },
+      { "id": "g52", "secteur": "Saint-Joseph-de-Ham-Sud", "region": "510 - Weedon", "code_geo": "40005", "notes": "" },
+      { "id": "g53", "secteur": "Saint-Camille", "region": "510 - Weedon", "code_geo": "40025", "notes": "" },
+      { "id": "g54", "secteur": "Lingwick", "region": "510 - Weedon", "code_geo": "41085", "notes": "" },
+      { "id": "g55", "secteur": "Weedon", "region": "510 - Weedon", "code_geo": "41098", "notes": "" },
+      { "id": "g56", "secteur": "Dudswell", "region": "510 - Weedon", "code_geo": "41117", "notes": "" },
+      { "id": "g57", "secteur": "Saint-Augustin-de-Woburn", "region": "511 - Lac-Mégantic", "code_geo": "30005", "notes": "" },
+      { "id": "g58", "secteur": "Notre-Dame-des-Bois", "region": "511 - Lac-Mégantic", "code_geo": "30010", "notes": "" },
+      { "id": "g59", "secteur": "Val-Racine", "region": "511 - Lac-Mégantic", "code_geo": "30015", "notes": "" },
+      { "id": "g60", "secteur": "Piopolis", "region": "511 - Lac-Mégantic", "code_geo": "30020", "notes": "" },
+      { "id": "g61", "secteur": "Frontenac", "region": "511 - Lac-Mégantic", "code_geo": "30025", "notes": "" },
+      { "id": "g62", "secteur": "Lac-Mégantic (Ville)", "region": "511 - Lac-Mégantic", "code_geo": "30030", "notes": "" },
+      { "id": "g63", "secteur": "Marston", "region": "511 - Lac-Mégantic", "code_geo": "30035", "notes": "" },
+      { "id": "g64", "secteur": "Milan", "region": "511 - Lac-Mégantic", "code_geo": "30040", "notes": "" },
+      { "id": "g65", "secteur": "Nantes", "region": "511 - Lac-Mégantic", "code_geo": "30045", "notes": "" },
+      { "id": "g66", "secteur": "Sainte-Cécile-de-Whitton", "region": "511 - Lac-Mégantic", "code_geo": "30050", "notes": "" },
+      { "id": "g67", "secteur": "Audet", "region": "511 - Lac-Mégantic", "code_geo": "30055", "notes": "" },
+      { "id": "g68", "secteur": "Saint-Ludger", "region": "511 - Lac-Mégantic", "code_geo": "30072", "notes": "" },
+      { "id": "g69", "secteur": "Racine", "region": "512 - Valcourt", "code_geo": "42032", "notes": "" },
+      { "id": "g70", "secteur": "Bonsecours", "region": "512 - Valcourt", "code_geo": "42040", "notes": "" },
+      { "id": "g71", "secteur": "Lawrenceville", "region": "512 - Valcourt", "code_geo": "42045", "notes": "" },
+      { "id": "g72", "secteur": "Sainte-Anne-de-la-Rochelle", "region": "512 - Valcourt", "code_geo": "42050", "notes": "" },
+      { "id": "g73", "secteur": "Valcourt (Ville / canton)", "region": "512 - Valcourt", "code_geo": "42060", "notes": "" },
+      { "id": "g74", "secteur": "Maricourt", "region": "512 - Valcourt", "code_geo": "42065", "notes": "" },
+      { "id": "g75", "secteur": "Potton", "region": "513 - Eastman", "code_geo": "45030", "notes": "" },
+      { "id": "g76", "secteur": "Saint-Benoît-du-Lac", "region": "513 - Eastman", "code_geo": "45080", "notes": "" },
+      { "id": "g77", "secteur": "Austin", "region": "513 - Eastman", "code_geo": "45085", "notes": "" },
+      { "id": "g78", "secteur": "Eastman", "region": "513 - Eastman", "code_geo": "45093", "notes": "" },
+      { "id": "g79", "secteur": "Bolton-Est", "region": "513 - Eastman", "code_geo": "45095", "notes": "" },
+      { "id": "g80", "secteur": "Saint-Étienne-de-Bolton", "region": "513 - Eastman", "code_geo": "45100", "notes": "" },
+      { "id": "g81", "secteur": "Stukely-Sud", "region": "513 - Eastman", "code_geo": "45105", "notes": "" },
+      { "id": "g82", "secteur": "Lac-Drolet", "region": "514 - Lambton", "code_geo": "30080", "notes": "" },
+      { "id": "g83", "secteur": "Saint-Sébastien", "region": "514 - Lambton", "code_geo": "30085", "notes": "" },
+      { "id": "g84", "secteur": "Courcelles", "region": "514 - Lambton", "code_geo": "30090", "notes": "" },
+      { "id": "g85", "secteur": "Lambton", "region": "514 - Lambton", "code_geo": "30095", "notes": "" },
+      { "id": "g86", "secteur": "Saint-Romain", "region": "514 - Lambton", "code_geo": "30100", "notes": "" },
+      { "id": "g87", "secteur": "Stornoway", "region": "514 - Lambton", "code_geo": "30105", "notes": "" },
+      { "id": "g88", "secteur": "Saint-Alphonse", "region": "679 - Granby", "code_geo": "47010", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g89", "secteur": "Granby", "region": "679 - Granby", "code_geo": "47017", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g90", "secteur": "Roxton Pond", "region": "679 - Granby", "code_geo": "47020", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g91", "secteur": "Sainte-Cécile-de-Milton", "region": "679 - Granby", "code_geo": "47047", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g92", "secteur": "Bolton-Ouest", "region": "681 - Waterloo", "code_geo": "46065", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g93", "secteur": "Lac-Brome", "region": "681 - Waterloo", "code_geo": "46075", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g94", "secteur": "Waterloo", "region": "681 - Waterloo", "code_geo": "47025", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g95", "secteur": "Warden", "region": "681 - Waterloo", "code_geo": "47030", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g96", "secteur": "Saint-Joachim-de-Shefford", "region": "681 - Waterloo", "code_geo": "47040", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g97", "secteur": "Béthanie", "region": "681 - Waterloo", "code_geo": "48005", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g98", "secteur": "Abercorn", "region": "683 - Cowansville", "code_geo": "46005", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g99", "secteur": "Dunham", "region": "683 - Cowansville", "code_geo": "46050", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g100", "secteur": "Sutton", "region": "683 - Cowansville", "code_geo": "46058", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g101", "secteur": "Brome", "region": "683 - Cowansville", "code_geo": "46070", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g102", "secteur": "Cowansville", "region": "683 - Cowansville", "code_geo": "46080", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g103", "secteur": "East Farnham", "region": "683 - Cowansville", "code_geo": "46085", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g104", "secteur": "Brigham", "region": "683 - Cowansville", "code_geo": "46090", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g105", "secteur": "Sainte-Sabine", "region": "684 - Farnham", "code_geo": "46105", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g106", "secteur": "Farnham", "region": "684 - Farnham", "code_geo": "46112", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g107", "secteur": "Ange-Gardien", "region": "685 - Bedford", "code_geo": "55008", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g108", "secteur": "Sainte-Brigide-d'Iberville", "region": "685 - Bedford", "code_geo": "56105", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g109", "secteur": "Frelighsburg", "region": "685 - Bedford", "code_geo": "46010", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g110", "secteur": "Saint-Armand", "region": "685 - Bedford", "code_geo": "46017", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g111", "secteur": "Saint-Pierre-de-Véronne-à-Pike-River", "region": "685 - Bedford", "code_geo": "46025", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g112", "secteur": "Bedford (canton)", "region": "685 - Bedford", "code_geo": "46030", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g113", "secteur": "Bedford (Ville)", "region": "685 - Bedford", "code_geo": "46035", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g114", "secteur": "Stanbridge East", "region": "685 - Bedford", "code_geo": "46040", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g115", "secteur": "Saint-Ignace-de-Stanbridge", "region": "685 - Bedford", "code_geo": "46095", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g116", "secteur": "Notre-Dame-de-Stanbridge", "region": "685 - Bedford", "code_geo": "46100", "notes": "zone hors Estrie mais utilisée par le service" },
+      { "id": "g117", "secteur": "Venise-en-Québec", "region": "685 - Bedford", "code_geo": "56005", "notes": "zone hors Estrie mais utilisée par le service" }
+    ]
+  },
+  {
+    "id": "rpa",
+    "label": "RPA (40)",
+    "columns": [
+      { "key": "nom", "label": "Nom de la résidence", "role": "title" },
+      { "key": "ville", "label": "Ville", "role": "meta" },
+      { "key": "adresse", "label": "Adresse", "role": "meta" },
+      { "key": "zone", "label": "No de zone", "role": "meta" },
+      { "key": "code_geo", "label": "Code géo", "role": "value" },
+      { "key": "code_installation", "label": "Code installation", "role": "value" },
+      { "key": "notes", "label": "Notes", "role": "notes" }
+    ],
+    "entries": [
+      { "id": "r1", "nom": "Les Jardins du Parc", "ville": "Coaticook", "adresse": "21, rue Adams (incluant 173, rue Martin et 218, rue Child)", "zone": "507", "code_geo": "44037", "code_installation": "4000353", "notes": "" },
+      { "id": "r2", "nom": "Maison Familiale de Coaticook", "ville": "Coaticook", "adresse": "136, rue Main Ouest", "zone": "507", "code_geo": "44037", "code_installation": "4000354", "notes": "" },
+      { "id": "r3", "nom": "Résidence Boiscastel", "ville": "Compton", "adresse": "399, rue Court", "zone": "507", "code_geo": "44071", "code_installation": "4000352", "notes": "" },
+      { "id": "r4", "nom": "Manoir de Chez Nous (2015) inc.", "ville": "Cookshire-Eaton", "adresse": "210, chemin de la Station", "zone": "504", "code_geo": "41038", "code_installation": "4007083", "notes": "" },
+      { "id": "r5", "nom": "Les Résidences du Haut-Saint-François inc.", "ville": "East Angus", "adresse": "82, rue Grondin", "zone": "504", "code_geo": "41060", "code_installation": "", "notes": "" },
+      { "id": "r6", "nom": "Accueil Notre-Dame inc.", "ville": "Magog", "adresse": "231, rue Dollard", "zone": "520", "code_geo": "45072", "code_installation": "4005939", "notes": "" },
+      { "id": "r7", "nom": "Havre des Cantons", "ville": "Magog", "adresse": "147, RUE VICTORIA", "zone": "520", "code_geo": "45072", "code_installation": "4004016", "notes": "" },
+      { "id": "r8", "nom": "Les Jardins de Magog", "ville": "Magog", "adresse": "445, rue Georges", "zone": "520", "code_geo": "45072", "code_installation": "4000378", "notes": "" },
+      { "id": "r9", "nom": "Les Jardins Pinecroft", "ville": "Magog", "adresse": "975, rue St-Luc", "zone": "520", "code_geo": "45072", "code_installation": "4005218", "notes": "" },
+      { "id": "r10", "nom": "Résidence Brunswick inc.", "ville": "Richmond", "adresse": "806, rue Principale Nord", "zone": "509", "code_geo": "42098", "code_installation": "4000337", "notes": "" },
+      { "id": "r11", "nom": "Résidence St-Patrice", "ville": "Sherbrooke", "adresse": "320, rue Saint-Patrice Ouest", "zone": "501", "code_geo": "43027", "code_installation": "4000379", "notes": "" },
+      { "id": "r12", "nom": "Résidence Ste-Marguerite-Marie", "ville": "Sherbrooke", "adresse": "64, rue Merry Nord", "zone": "501", "code_geo": "43027", "code_installation": "", "notes": "" },
+      { "id": "r13", "nom": "Manoir Magog", "ville": "Sherbrooke", "adresse": "1007, rue Merry Nord", "zone": "501", "code_geo": "43027", "code_installation": "", "notes": "" },
+      { "id": "r14", "nom": "Chartwell Les Seigneuries du Carrefour", "ville": "Sherbrooke", "adresse": "445, rue des Érables", "zone": "501", "code_geo": "43027", "code_installation": "4005147", "notes": "" },
+      { "id": "r15", "nom": "Auberge Anokhi", "ville": "Sherbrooke", "adresse": "10, rue Brooks", "zone": "501", "code_geo": "43027", "code_installation": "4000414", "notes": "" },
+      { "id": "r16", "nom": "Chartwell Rock Forest", "ville": "Sherbrooke", "adresse": "1111, rue du Haut-Bois Nord", "zone": "501", "code_geo": "43027", "code_installation": "4005461", "notes": "" },
+      { "id": "r17", "nom": "Chartwell Villa de l'Estrie, résidence pour retraités", "ville": "Sherbrooke", "adresse": "3300, rue des Chênes", "zone": "501", "code_geo": "43027", "code_installation": "4007276", "notes": "" },
+      { "id": "r18", "nom": "Hôtellerie Beauséjour", "ville": "Sherbrooke", "adresse": "765, rue des Chênes", "zone": "501", "code_geo": "43027", "code_installation": "4000415", "notes": "" },
+      { "id": "r19", "nom": "La Grande Vie, coopérative de solidarité en habitation", "ville": "Sherbrooke", "adresse": "1360, rue de l'Ontario", "zone": "501", "code_geo": "43027", "code_installation": "4000417", "notes": "" },
+      { "id": "r20", "nom": "Le Renaissance Fleurimont", "ville": "Sherbrooke", "adresse": "1341, rue King Est", "zone": "501", "code_geo": "43027", "code_installation": "4006254", "notes": "" },
+      { "id": "r21", "nom": "Les Résidences et Appartements Le Monastère", "ville": "Sherbrooke", "adresse": "871, rue de l'Ontario (incluant 861 et 1400, rue Desgagné)", "zone": "501", "code_geo": "43027", "code_installation": "4000420", "notes": "" },
+      { "id": "r22", "nom": "Les Résidences Soleil Manoir du Musée", "ville": "Sherbrooke", "adresse": "245, rue Frontenac", "zone": "501", "code_geo": "43027", "code_installation": "4007537", "notes": "" },
+      { "id": "r23", "nom": "Les Résidences Soleil Manoir Sherbrooke", "ville": "Sherbrooke", "adresse": "1150, rue des Quatre-Saisons", "zone": "501", "code_geo": "43027", "code_installation": "4004591", "notes": "" },
+      { "id": "r24", "nom": "Les résidences unique Sherbrooke 2023", "ville": "Sherbrooke", "adresse": "950, rue Fédéral", "zone": "501", "code_geo": "43027", "code_installation": "4004589", "notes": "" },
+      { "id": "r25", "nom": "Les Terrasses Belle-Vue", "ville": "Sherbrooke", "adresse": "1330, rue Galt Ouest", "zone": "501", "code_geo": "43027", "code_installation": "4004870", "notes": "" },
+      { "id": "r26", "nom": "Manoir St-Francis", "ville": "Sherbrooke", "adresse": "125, rue Queen", "zone": "501", "code_geo": "43027", "code_installation": "4000423", "notes": "" },
+      { "id": "r27", "nom": "Pavillon Rock Forest inc.", "ville": "Sherbrooke", "adresse": "5323, rue Gaspé", "zone": "501", "code_geo": "43027", "code_installation": "4000444", "notes": "" },
+      { "id": "r28", "nom": "Résidence Brooks", "ville": "Sherbrooke", "adresse": "55, rue Brooks", "zone": "501", "code_geo": "43027", "code_installation": "4000640", "notes": "" },
+      { "id": "r29", "nom": "Résidence du Roi", "ville": "Sherbrooke", "adresse": "1016, rue Galt Ouest", "zone": "501", "code_geo": "43027", "code_installation": "4000432", "notes": "" },
+      { "id": "r30", "nom": "Résidence Fontaine", "ville": "Sherbrooke", "adresse": "215, 4e Avenue", "zone": "501", "code_geo": "43027", "code_installation": "4000403", "notes": "" },
+      { "id": "r31", "nom": "Résidence La Cité Fleurie", "ville": "Sherbrooke", "adresse": "1525, rue du Conseil", "zone": "501", "code_geo": "43027", "code_installation": "4000389", "notes": "" },
+      { "id": "r32", "nom": "Résidence Le Boisé du Lac", "ville": "Sherbrooke", "adresse": "168, rue Albert-Dion", "zone": "501", "code_geo": "43027", "code_installation": "4005136", "notes": "" },
+      { "id": "r33", "nom": "Résidence Le VU", "ville": "Sherbrooke", "adresse": "111, rue Bellevue", "zone": "501", "code_geo": "43027", "code_installation": "4007199", "notes": "" },
+      { "id": "r34", "nom": "Résidence London", "ville": "Sherbrooke", "adresse": "301, rue London", "zone": "501", "code_geo": "43027", "code_installation": "4006529", "notes": "" },
+      { "id": "r35", "nom": "Résidence Marie-Jeanne", "ville": "Sherbrooke", "adresse": "926, rue de l'Ontario", "zone": "501", "code_geo": "43027", "code_installation": "4007949", "notes": "" },
+      { "id": "r36", "nom": "Résidence Murray", "ville": "Sherbrooke", "adresse": "205, rue Murray", "zone": "501", "code_geo": "43027", "code_installation": "4000395", "notes": "" },
+      { "id": "r37", "nom": "Résidence Portland", "ville": "Sherbrooke", "adresse": "2630, boulevard de Portland", "zone": "501", "code_geo": "43027", "code_installation": "4005870", "notes": "" },
+      { "id": "r38", "nom": "Résidence Sainte-Famille", "ville": "Sherbrooke", "adresse": "73, 9e Avenue Sud", "zone": "501", "code_geo": "43027", "code_installation": "4000397", "notes": "" },
+      { "id": "r39", "nom": "Résidence Ste-Jeanne D'Arc", "ville": "Sherbrooke", "adresse": "1270, rue Galt Ouest", "zone": "501", "code_geo": "43027", "code_installation": "4004706", "notes": "" },
+      { "id": "r40", "nom": "Terrasses Bowen", "ville": "Sherbrooke", "adresse": "633, rue Bowen Sud", "zone": "501", "code_geo": "43027", "code_installation": "4007477", "notes": "" },
+      { "id": "r41", "nom": "Village Grace", "ville": "Sherbrooke", "adresse": "1515, rue Pleasant View", "zone": "501", "code_geo": "43027", "code_installation": "4007311", "notes": "" },
+      { "id": "r42", "nom": "Manoir Stanstead", "ville": "Stanstead", "adresse": "496, rue Dufferin", "zone": "506", "code_geo": "45025", "code_installation": "4005610", "notes": "" },
+      { "id": "r43", "nom": "La Maison du Berger", "ville": "Waterville", "adresse": "265, rue Compton Est", "zone": "501", "code_geo": "44080", "code_installation": "4006421", "notes": "" },
+      { "id": "r44", "nom": "Résidences Le Château du Bel Âge inc.", "ville": "Windsor", "adresse": "16, rue St-Georges", "zone": "502", "code_geo": "42088", "code_installation": "4004839", "notes": "" }
+    ]
+  },
+  {
+    "id": "police",
+    "label": "No corps policier",
+    "columns": [
+      { "key": "corps", "label": "Corps policier", "role": "title" },
+      { "key": "code", "label": "No corps policier", "role": "value" },
+      { "key": "notes", "label": "Notes", "role": "notes" }
+    ],
+    "entries": [
+      { "id": "p1", "corps": "SPS Sherbrooke", "code": "30905", "notes": "" },
+      { "id": "p2", "corps": "SQ Autoroutier", "code": "40119", "notes": "" },
+      { "id": "p3", "corps": "SM Memphrémagog", "code": "30914", "notes": "" },
+      { "id": "p4", "corps": "SQ Memphrémagog", "code": "40378", "notes": "" },
+      { "id": "p5", "corps": "SQ Coaticook", "code": "40113", "notes": "" },
+      { "id": "p6", "corps": "SQ MRC du Haut-Saint-François", "code": "40114", "notes": "" },
+      { "id": "p7", "corps": "SQ Drummondville", "code": "40115", "notes": "" },
+      { "id": "p8", "corps": "SQ Lac-Mégantic", "code": "40116", "notes": "" },
+      { "id": "p9", "corps": "SQ Richmond", "code": "40118", "notes": "" },
+      { "id": "p10", "corps": "SQ Val-des-Sources", "code": "40122", "notes": "" }
+    ]
+  },
+  {
+    "id": "autres_codes",
+    "label": "Autres codes",
+    "columns": [
+      { "key": "description", "label": "Description", "role": "title" },
+      { "key": "categorie", "label": "Catégorie", "role": "meta" },
+      { "key": "code", "label": "Code", "role": "value" },
+      { "key": "notes", "label": "Notes", "role": "notes" }
+    ],
+    "entries": [
+      { "id": "a1", "description": "05 = Étab./Inst. Québec", "categorie": "Code de PEC et DEST", "code": "05", "notes": "" },
+      { "id": "a2", "description": "20 = Résidence privée", "categorie": "Code de PEC et DEST", "code": "20", "notes": "" },
+      { "id": "a3", "description": "25 = Étab. Carcéral", "categorie": "Code de PEC et DEST", "code": "25", "notes": "" },
+      { "id": "a4", "description": "35 = Soins palliatifs", "categorie": "Code de PEC et DEST", "code": "35", "notes": "" },
+      { "id": "a5", "description": "40 = RPA (voir l'onglet RPA pour le code)", "categorie": "Code de PEC et DEST", "code": "40", "notes": "" },
+      { "id": "a6", "description": "45 = Clinique privée/GMF", "categorie": "Code de PEC et DEST", "code": "45", "notes": "" },
+      { "id": "a7", "description": "50 = Lieu aérien", "categorie": "Code de PEC et DEST", "code": "50", "notes": "" },
+      { "id": "a8", "description": "55 = Lieu public", "categorie": "Code de PEC et DEST", "code": "55", "notes": "" },
+      { "id": "a9", "description": "60 = Acc. Route", "categorie": "Code de PEC et DEST", "code": "60", "notes": "" },
+      { "id": "a10", "description": "65 = Acc. Travail", "categorie": "Code de PEC et DEST", "code": "65", "notes": "" },
+      { "id": "a11", "description": "70 = Hors province", "categorie": "Code de PEC et DEST", "code": "70", "notes": "" },
+      { "id": "a12", "description": "CHUS Fleurimont", "categorie": "Code hôpital (format sans tiret)", "code": "51216687", "notes": "" },
+      { "id": "a13", "description": "CHUS Hôtel-Dieu", "categorie": "Code hôpital (format sans tiret)", "code": "51216695", "notes": "" },
+      { "id": "a14", "description": "CH Magog", "categorie": "Code hôpital (format sans tiret)", "code": "51219046", "notes": "" },
+      { "id": "a15", "description": "CH Coaticook", "categorie": "Code hôpital (format sans tiret)", "code": "51219350", "notes": "" },
+      { "id": "a16", "description": "CSSS Val-Saint-François", "categorie": "Code hôpital (format sans tiret)", "code": "51248458", "notes": "" },
+      { "id": "a17", "description": "CH Lac-Mégantic", "categorie": "Code hôpital (format sans tiret)", "code": "51223832", "notes": "" },
+      { "id": "a18", "description": "CH Drummondville", "categorie": "Code hôpital (format sans tiret)", "code": "51228781", "notes": "" },
+      { "id": "a19", "description": "Aéroport de Sherbrooke", "categorie": "Autre installation", "code": "60000868", "notes": "" },
+      { "id": "a20", "description": "Prison de Sherbrooke", "categorie": "Autre installation", "code": "70000051", "notes": "" }
+    ]
+  }
+];
+
+  var state = {
+    sections: [],
+    loaded:false,
+    loadError:null,
+    activeId:'fax',
+    search:'',
+    mode:null,
+    confirmingDelete:null,
+    syncStatus:'connecting' // connecting | live | error
+  };
+
+  function genId(){ return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function escapeHtml(str){ var d=document.createElement('div'); d.textContent = str==null?'':String(str); return d.innerHTML; }
+  function normalize(str){ return (str||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+
+  var toastTimer=null;
+  function showToast(msg){
+    var el=document.getElementById('toast');
+    el.textContent=msg;
+    el.classList.add('show');
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){ el.classList.remove('show'); }, 2200);
+  }
+
+  function copyValue(value){
+    if(!value) return;
+    function ok(){ showToast('Copié : ' + value); }
+    function fail(){
+      try{
+        var ta=document.createElement('textarea');
+        ta.value=value; ta.style.position='fixed'; ta.style.opacity='0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        ok();
+      }catch(e){ showToast('Impossible de copier'); }
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(value).then(ok, fail);
+    } else { fail(); }
+  }
+  window.copyValueEl = function(value){ copyValue(value); };
+
+  // ---- Migrations (appliquées une fois au chargement initial si nécessaire) ----
+  function migrateAreaCodes(sections){
+    var changed = false;
+    var fax = null;
+    for(var i=0;i<sections.length;i++) if(sections[i].id==='fax') fax = sections[i];
+    if(!fax) return changed;
+    var targets = ['Fleurimont', 'Hôtel-Dieu (HD)'];
+    fax.entries.forEach(function(e){
+      if(targets.indexOf(e.site)!==-1 && e.value && e.value.indexOf('819-')!==0){
+        e.value = '819-' + e.value;
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function migrateSectionLabels(sections){
+    var changed = false;
+    sections.forEach(function(s){
+      var seedMatch = null;
+      for(var i=0;i<SEED_SECTIONS.length;i++) if(SEED_SECTIONS[i].id===s.id) seedMatch = SEED_SECTIONS[i];
+      if(seedMatch && seedMatch.label !== s.label){
+        s.label = seedMatch.label;
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  var initializing = false;
+  var suppressNextRemoteRender = false;
+
+  // ---- Chargement + écoute temps réel Firestore ----
+  function startListening(){
+    docRef.onSnapshot(function(snap){
+      if(!snap.exists){
+        // Première utilisation : personne n'a encore initialisé la base
+        if(!initializing){
+          initializing = true;
+          docRef.set({ sections: SEED_SECTIONS }).catch(function(err){
+            console.error(err);
+            state.syncStatus = 'error';
+            render();
+          });
+        }
+        return;
+      }
+      var data = snap.data();
+      var sections = (data && data.sections) ? data.sections : SEED_SECTIONS;
+
+      var needsSave = false;
+      if(migrateAreaCodes(sections)) needsSave = true;
+      if(migrateSectionLabels(sections)) needsSave = true;
+
+      state.sections = sections;
+      state.loaded = true;
+      state.syncStatus = 'live';
+      state.loadError = null;
+
+      if(!state.mode){
+        render();
+      } else {
+        renderTabBar();
+      }
+
+      if(needsSave){
+        docRef.set({ sections: state.sections }).catch(function(e){ /* silencieux, retentera plus tard */ });
+      }
+    }, function(err){
+      console.error(err);
+      state.syncStatus = 'error';
+      state.loadError = "Connexion au répertoire partagé impossible. Vérifie ta connexion internet.";
+      if(!state.loaded){
+        state.sections = SEED_SECTIONS;
+        state.loaded = true;
+      }
+      render();
+    });
+  }
+
+  async function persist(){
+    try{
+      await docRef.set({ sections: state.sections });
+    }catch(e){
+      showToast("Erreur d'enregistrement — réessaie");
+      throw e;
+    }
+  }
+
+  function getSection(id){
+    for(var i=0;i<state.sections.length;i++) if(state.sections[i].id===id) return state.sections[i];
+    return null;
+  }
+  function getActive(){ return getSection(state.activeId) || state.sections[0]; }
+  function findEntry(section, entryId){
+    for(var i=0;i<section.entries.length;i++) if(section.entries[i].id===entryId) return section.entries[i];
+    return null;
+  }
+
+  window.switchTab = function(id){
+    state.activeId = id;
+    state.search='';
+    state.mode=null;
+    state.confirmingDelete=null;
+    document.getElementById('search-input').value='';
+    render();
+  };
+
+  window.handleSearch = function(ev){
+    state.search = ev.target.value;
+    render();
+  };
+
+  window.openAdd = function(){
+    state.mode = {type:'add'};
+    state.confirmingDelete=null;
+    render();
+    setTimeout(function(){
+      var s=getActive();
+      var el=document.getElementById('field-'+s.columns[0].key);
+      if(el) el.focus();
+    }, 30);
+  };
+  window.openEdit = function(entryId){
+    state.mode = {type:'edit', entryId:entryId};
+    state.confirmingDelete=null;
+    render();
+    setTimeout(function(){
+      var s=getActive();
+      var el=document.getElementById('field-'+s.columns[0].key);
+      if(el) el.focus();
+    }, 30);
+  };
+  window.cancelForm = function(){
+    state.mode=null;
+    render();
+  };
+
+  window.submitForm = async function(){
+    var section = getActive();
+    var data = {};
+    section.columns.forEach(function(col){
+      var el = document.getElementById('field-'+col.key);
+      data[col.key] = el ? el.value.trim() : '';
+    });
+    var titleCol = section.columns.filter(function(c){ return c.role==='title'; })[0];
+    if(titleCol && !data[titleCol.key]){
+      showToast('Le champ "' + titleCol.label + '" est requis');
+      return;
+    }
+    var wasAdd = state.mode.type==='add';
+    if(wasAdd){
+      data.id = genId();
+      section.entries.push(data);
+    } else {
+      var entry = findEntry(section, state.mode.entryId);
+      if(entry){
+        section.columns.forEach(function(col){ entry[col.key] = data[col.key]; });
+      }
+    }
+    state.mode=null;
+    render();
+    try{
+      await persist();
+      showToast('Sauvegardé');
+    }catch(e){ /* toast déjà affiché par persist() */ }
+  };
+
+  window.askDelete = function(entryId){
+    if(state.confirmingDelete===entryId){
+      doDelete(entryId);
+      return;
+    }
+    state.confirmingDelete = entryId;
+    render();
+    setTimeout(function(){
+      if(state.confirmingDelete===entryId){
+        state.confirmingDelete=null;
+        render();
+      }
+    }, 3000);
+  };
+  async function doDelete(entryId){
+    var section = getActive();
+    section.entries = section.entries.filter(function(e){ return e.id!==entryId; });
+    state.confirmingDelete=null;
+    render();
+    try{
+      await persist();
+      showToast('Supprimé');
+    }catch(e){ /* toast déjà affiché */ }
+  }
+
+  function entryMatches(section, entry, term){
+    if(!term) return true;
+    for(var i=0;i<section.columns.length;i++){
+      var v = entry[section.columns[i].key];
+      if(v && normalize(v).indexOf(term)!==-1) return true;
+    }
+    return false;
+  }
+
+  function renderForm(section, existingEntry){
+    var html = '<div class="inline-form">';
+    section.columns.forEach(function(col){
+      var val = existingEntry ? (existingEntry[col.key]||'') : '';
+      html += '<label>' + escapeHtml(col.label) + (col.role==='title'?' *':'') + '</label>';
+      html += '<input id="field-' + col.key + '" value="' + escapeHtml(val) + '" placeholder="' + escapeHtml(col.label) + '" />';
+    });
+    html += '<div class="btnrow">' +
+      '<button class="btn primary" onclick="submitForm()">Sauvegarder</button>' +
+      '<button class="btn ghost" onclick="cancelForm()">Annuler</button>' +
+      '</div></div>';
+    return html;
+  }
+
+  function renderEntryCard(section, entry){
+    if(state.mode && state.mode.type==='edit' && state.mode.entryId===entry.id){
+      return renderForm(section, entry);
+    }
+    var titleCol = section.columns.filter(function(c){ return c.role==='title'; })[0];
+    var metaCols = section.columns.filter(function(c){ return c.role==='meta'; });
+    var valueCols = section.columns.filter(function(c){ return c.role==='value'; });
+    var notesCol = section.columns.filter(function(c){ return c.role==='notes'; })[0];
+    var confirming = state.confirmingDelete===entry.id;
+
+    var html = '<div class="entry-card"><div class="entry-main">';
+    if(titleCol) html += '<div class="entry-title">' + escapeHtml(entry[titleCol.key]||'') + '</div>';
+    metaCols.forEach(function(metaCol){
+      if(entry[metaCol.key]) html += '<div class="entry-meta">' + escapeHtml(entry[metaCol.key]) + '</div>';
+    });
+    if(valueCols.length){
+      html += '<div class="value-row">';
+      valueCols.forEach(function(col){
+        var v = entry[col.key] || '';
+        var safe = escapeHtml(v).replace(/'/g,"\\'");
+        html += '<button class="value-chip" onclick="copyValueEl(\'' + safe + '\')">' +
+          '<span class="vlabel">' + escapeHtml(col.label.toUpperCase()) + '</span>' +
+          '<span class="vvalue' + (v?'':' empty') + '">' + (v?escapeHtml(v):'à compléter') + '</span>' +
+          '</button>';
+      });
+      html += '</div>';
+    }
+    if(notesCol && entry[notesCol.key]) html += '<div class="entry-notes">' + escapeHtml(entry[notesCol.key]) + '</div>';
+    html += '</div>';
+    html += '<div class="entry-actions">' +
+      '<button class="icon-btn" title="Modifier" onclick="openEdit(\'' + entry.id + '\')">&#9998;</button>' +
+      '<button class="icon-btn danger' + (confirming?' confirming':'') + '" title="Supprimer" onclick="askDelete(\'' + entry.id + '\')">' + (confirming?'Sûr ?':'&#10005;') + '</button>' +
+      '</div></div>';
+    return html;
+  }
+
+  function renderTabBar(){
+    var html='';
+    state.sections.forEach(function(s){
+      html += '<button class="tab-btn' + (s.id===state.activeId?' active':'') + '" onclick="switchTab(\'' + s.id + '\')">' +
+        escapeHtml(s.label) + ' · ' + s.entries.length +
+        '</button>';
+    });
+    document.getElementById('tabbar').innerHTML = html;
+  }
+
+  function render(){
+    var statusArea = document.getElementById('status-area');
+    var container = document.getElementById('section-container');
+
+    if(!state.loaded){
+      statusArea.innerHTML = '<p class="status-line">Connexion au répertoire partagé...</p>';
+      container.innerHTML='';
+      document.getElementById('tabbar').innerHTML='';
+      return;
+    }
+
+    if(state.loadError){
+      statusArea.innerHTML = '<p class="status-line err">' + escapeHtml(state.loadError) + '</p>';
+    } else if(state.syncStatus==='live'){
+      statusArea.innerHTML = '';
+    } else {
+      statusArea.innerHTML = '';
+    }
+
+    renderTabBar();
+
+    var section = getActive();
+    var term = normalize(state.search.trim());
+    var filtered = section.entries.filter(function(e){ return entryMatches(section, e, term); });
+
+    var body = '<div class="section-card">';
+    if(section.entries.length===0){
+      body += '<div class="section-empty"><span class="big">En attente de données</span>Cet onglet est vide pour l\'instant. Ajoute une ligne ci-dessous, ou attends les données à venir.</div>';
+    } else if(filtered.length===0){
+      body += '<div class="section-empty">Aucun résultat pour "' + escapeHtml(state.search) + '" dans cet onglet.</div>';
+    } else {
+      filtered.forEach(function(entry){
+        body += renderEntryCard(section, entry);
+      });
+    }
+    if(state.mode && state.mode.type==='add'){
+      body += renderForm(section, null);
+    } else {
+      body += '<button class="add-entry-btn" onclick="openAdd()">+ ajouter une ligne à ' + escapeHtml(section.label) + '</button>';
+    }
+    body += '</div>';
+    container.innerHTML = body;
+  }
+
+  document.getElementById('search-input').addEventListener('input', window.handleSearch);
+
+  startListening();
+})();
+</script>
+</body>
+</html>

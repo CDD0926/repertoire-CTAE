@@ -176,6 +176,15 @@ html,body{ margin:0; padding:0; background:var(--bg); }
   padding:2px 7px;
   flex-shrink:0;
 }
+.repfax .group-header.subgroup-header{
+  padding-left:32px;
+  background:var(--surface);
+  font-size:0.85rem;
+}
+.repfax .group-header.subgroup-header .group-name{
+  font-weight:500;
+  color:var(--text-muted);
+}
 .repfax .group-entries{
   background:var(--bg);
 }
@@ -344,49 +353,50 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     "id": "fax",
     "label": "FAX",
     "columns": [
-      { "key": "site", "label": "Site", "role": "group" },
+      { "key": "ville", "label": "Ville", "role": "group" },
+      { "key": "site", "label": "Site", "role": "subgroup" },
       { "key": "unit", "label": "Étage / Unité", "role": "title" },
       { "key": "value", "label": "Fax", "role": "value" },
       { "key": "notes", "label": "Notes", "role": "notes" }
     ],
     "entries": [
-      { "id": "e1", "site": "CHUS – Hôpital Fleurimont", "unit": "3e Hémo", "value": "819-829-6469", "notes": "" },
-      { "id": "e2", "site": "CHUS – Hôpital Fleurimont", "unit": "3e soins coro", "value": "819-564-5245", "notes": "" },
-      { "id": "e3", "site": "CHUS – Hôpital Fleurimont", "unit": "3e SI", "value": "819-829-3242", "notes": "" },
-      { "id": "e4", "site": "CHUS – Hôpital Fleurimont", "unit": "3e bloc", "value": "819-820-6470", "notes": "" },
-      { "id": "e5", "site": "CHUS – Hôpital Fleurimont", "unit": "4e B", "value": "819-820-6481", "notes": "" },
-      { "id": "e6", "site": "CHUS – Hôpital Fleurimont", "unit": "Maternité", "value": "819-820-6441", "notes": "" },
-      { "id": "e7", "site": "CHUS – Hôpital Fleurimont", "unit": "Néonat", "value": "819-820-6477", "notes": "" },
-      { "id": "e8", "site": "CHUS – Hôpital Fleurimont", "unit": "Ped", "value": "819-820-6482", "notes": "" },
-      { "id": "e9", "site": "CHUS – Hôpital Fleurimont", "unit": "Chx 1 jour 6e", "value": "819-829-3251", "notes": "" },
-      { "id": "e10", "site": "CHUS – Hôpital Fleurimont", "unit": "6e A", "value": "819-820-6460", "notes": "" },
-      { "id": "e11", "site": "CHUS – Hôpital Fleurimont", "unit": "6e C", "value": "819-829-3259", "notes": "" },
-      { "id": "e12", "site": "CHUS – Hôpital Fleurimont", "unit": "9e SI", "value": "819-829-3243", "notes": "" },
-      { "id": "e13", "site": "CHUS – Hôpital Fleurimont", "unit": "10e", "value": "819-829-3234", "notes": "" },
-      { "id": "e14", "site": "CHUS – Hôtel-Dieu", "unit": "Poste 300", "value": "819-829-6270", "notes": "" },
-      { "id": "e15", "site": "CHUS – Hôtel-Dieu", "unit": "3e SI", "value": "819-822-6787", "notes": "" },
-      { "id": "e16", "site": "CHUS – Hôtel-Dieu", "unit": "3e C", "value": "819-829-6269", "notes": "" },
-      { "id": "e17", "site": "CHUS – Hôtel-Dieu", "unit": "4C", "value": "819-829-6271", "notes": "" },
-      { "id": "e18", "site": "CHUS – Hôtel-Dieu", "unit": "5C", "value": "819-829-6268", "notes": "" },
-      { "id": "e19", "site": "CHUS – Hôtel-Dieu", "unit": "6C", "value": "819-829-6292", "notes": "" },
-      { "id": "e20", "site": "CHUS – Hôtel-Dieu", "unit": "Soins Pal", "value": "819-829-6277", "notes": "" },
-      { "id": "e21", "site": "Drummondville", "unit": "Néonat (2e)", "value": "819-478-6402", "notes": "" },
-      { "id": "e22", "site": "Drummondville", "unit": "Ped (2e)", "value": "819-478-6416", "notes": "" },
-      { "id": "e23", "site": "Drummondville", "unit": "SI (4e)", "value": "819-478-6463", "notes": "" },
-      { "id": "e24", "site": "Drummondville", "unit": "Psy (7e)", "value": "819-478-5093", "notes": "" },
-      { "id": "e25", "site": "Victoriaville", "unit": "Maternité (4e)", "value": "", "notes": "à compléter" },
-      { "id": "e26", "site": "Victoriaville", "unit": "SI", "value": "819-357-6017", "notes": "" },
-      { "id": "e27", "site": "Granby", "unit": "Néonat (2e)", "value": "450-375-8036", "notes": "" },
-      { "id": "e28", "site": "Granby", "unit": "SI (2e)", "value": "450-375-8011", "notes": "" },
-      { "id": "e29", "site": "Cowansville", "unit": "Néonat", "value": "", "notes": "à compléter" },
-      { "id": "e30", "site": "Cowansville", "unit": "SI", "value": "450-266-5577", "notes": "" },
-      { "id": "e31", "site": "Thetford Mines", "unit": "SI", "value": "418-338-7758", "notes": "" },
-      { "id": "e32", "site": "St-Hyacinthe", "unit": "Néonat", "value": "450-771-3527", "notes": "" },
-      { "id": "e33", "site": "Children's / CUSM", "unit": "Urgence", "value": "514-412-4219", "notes": "" },
-      { "id": "e34", "site": "Children's / CUSM", "unit": "NICU (6e)", "value": "514-938-7675", "notes": "" },
-      { "id": "e35", "site": "Children's / CUSM", "unit": "Neurochir ped (8e)", "value": "514-412-4267", "notes": "" },
-      { "id": "e36", "site": "CHUL", "unit": "Mère-enfant", "value": "418-577-2051", "notes": "" },
-      { "id": "e37", "site": "CHU Sainte-Justine", "unit": "6e", "value": "", "notes": "à compléter" }
+      { "id": "e1", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "3e Hémo", "value": "819-829-6469", "notes": "" },
+      { "id": "e2", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "3e soins coro", "value": "819-564-5245", "notes": "" },
+      { "id": "e3", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "3e SI", "value": "819-829-3242", "notes": "" },
+      { "id": "e4", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "3e bloc", "value": "819-820-6470", "notes": "" },
+      { "id": "e5", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "4e B", "value": "819-820-6481", "notes": "" },
+      { "id": "e6", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "Maternité", "value": "819-820-6441", "notes": "" },
+      { "id": "e7", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "Néonat", "value": "819-820-6477", "notes": "" },
+      { "id": "e8", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "Ped", "value": "819-820-6482", "notes": "" },
+      { "id": "e9", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "Chx 1 jour 6e", "value": "819-829-3251", "notes": "" },
+      { "id": "e10", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "6e A", "value": "819-820-6460", "notes": "" },
+      { "id": "e11", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "6e C", "value": "819-829-3259", "notes": "" },
+      { "id": "e12", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "9e SI", "value": "819-829-3243", "notes": "" },
+      { "id": "e13", "ville": "Sherbrooke", "site": "CHUS – Hôpital Fleurimont", "unit": "10e", "value": "819-829-3234", "notes": "" },
+      { "id": "e14", "ville": "Sherbrooke", "site": "CHUS – Hôtel-Dieu", "unit": "Poste 300", "value": "819-829-6270", "notes": "" },
+      { "id": "e15", "ville": "Sherbrooke", "site": "CHUS – Hôtel-Dieu", "unit": "3e SI", "value": "819-822-6787", "notes": "" },
+      { "id": "e16", "ville": "Sherbrooke", "site": "CHUS – Hôtel-Dieu", "unit": "3e C", "value": "819-829-6269", "notes": "" },
+      { "id": "e17", "ville": "Sherbrooke", "site": "CHUS – Hôtel-Dieu", "unit": "4C", "value": "819-829-6271", "notes": "" },
+      { "id": "e18", "ville": "Sherbrooke", "site": "CHUS – Hôtel-Dieu", "unit": "5C", "value": "819-829-6268", "notes": "" },
+      { "id": "e19", "ville": "Sherbrooke", "site": "CHUS – Hôtel-Dieu", "unit": "6C", "value": "819-829-6292", "notes": "" },
+      { "id": "e20", "ville": "Sherbrooke", "site": "CHUS – Hôtel-Dieu", "unit": "Soins Pal", "value": "819-829-6277", "notes": "" },
+      { "id": "e21", "ville": "Drummondville", "site": "Drummondville", "unit": "Néonat (2e)", "value": "819-478-6402", "notes": "" },
+      { "id": "e22", "ville": "Drummondville", "site": "Drummondville", "unit": "Ped (2e)", "value": "819-478-6416", "notes": "" },
+      { "id": "e23", "ville": "Drummondville", "site": "Drummondville", "unit": "SI (4e)", "value": "819-478-6463", "notes": "" },
+      { "id": "e24", "ville": "Drummondville", "site": "Drummondville", "unit": "Psy (7e)", "value": "819-478-5093", "notes": "" },
+      { "id": "e25", "ville": "Victoriaville", "site": "Victoriaville", "unit": "Maternité (4e)", "value": "", "notes": "à compléter" },
+      { "id": "e26", "ville": "Victoriaville", "site": "Victoriaville", "unit": "SI", "value": "819-357-6017", "notes": "" },
+      { "id": "e27", "ville": "Granby", "site": "Granby", "unit": "Néonat (2e)", "value": "450-375-8036", "notes": "" },
+      { "id": "e28", "ville": "Granby", "site": "Granby", "unit": "SI (2e)", "value": "450-375-8011", "notes": "" },
+      { "id": "e29", "ville": "Cowansville", "site": "Cowansville", "unit": "Néonat", "value": "", "notes": "à compléter" },
+      { "id": "e30", "ville": "Cowansville", "site": "Cowansville", "unit": "SI", "value": "450-266-5577", "notes": "" },
+      { "id": "e31", "ville": "Thetford Mines", "site": "Thetford Mines", "unit": "SI", "value": "418-338-7758", "notes": "" },
+      { "id": "e32", "ville": "Saint-Hyacinthe", "site": "St-Hyacinthe", "unit": "Néonat", "value": "450-771-3527", "notes": "" },
+      { "id": "e33", "ville": "Montréal", "site": "Children's / CUSM", "unit": "Urgence", "value": "514-412-4219", "notes": "" },
+      { "id": "e34", "ville": "Montréal", "site": "Children's / CUSM", "unit": "NICU (6e)", "value": "514-938-7675", "notes": "" },
+      { "id": "e35", "ville": "Montréal", "site": "Children's / CUSM", "unit": "Neurochir ped (8e)", "value": "514-412-4267", "notes": "" },
+      { "id": "e36", "ville": "Québec", "site": "CHUL", "unit": "Mère-enfant", "value": "418-577-2051", "notes": "" },
+      { "id": "e37", "ville": "Montréal", "site": "CHU Sainte-Justine", "unit": "6e", "value": "", "notes": "à compléter" }
     ]
   },
   {
@@ -943,6 +953,7 @@ html,body{ margin:0; padding:0; background:var(--bg); }
       if(migrateSectionLabels(sections)) needsSave = true;
       if(migrateColumnDefs(sections)) needsSave = true;
       if(migrateFieldFromSeed(sections, 'code_etablissement', 'ville')) needsSave = true;
+      if(migrateFieldFromSeed(sections, 'fax', 'ville')) needsSave = true;
 
       state.sections = sections;
       state.loaded = true;
@@ -992,7 +1003,30 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     var cols = section.columns.filter(function(c){ return c.role==='group'; });
     return cols.length ? cols[0] : null;
   }
+  function getSubgroupColumn(section){
+    var cols = section.columns.filter(function(c){ return c.role==='subgroup'; });
+    return cols.length ? cols[0] : null;
+  }
   function groupStateKey(sectionId, groupValue){ return sectionId + '::' + groupValue; }
+  function subgroupStateKey(sectionId, groupValue, subValue){ return sectionId + '::' + groupValue + '::' + subValue; }
+
+  // Ordre de priorité personnalisé pour certains onglets : les valeurs
+  // listées ici apparaissent en premier dans cet ordre précis, puis tout
+  // le reste suit en ordre alphabétique.
+  var GROUP_PRIORITY = {
+    'code_etablissement': ['Sherbrooke', 'Magog', 'East Angus', 'Richmond', 'Valcourt', 'Stanstead'],
+    'fax': ['Sherbrooke']
+  };
+  function sortGroupNames(sectionId, names){
+    var priority = GROUP_PRIORITY[sectionId] || [];
+    return names.slice().sort(function(a,b){
+      var ia = priority.indexOf(a); if(ia===-1) ia = 999 + priority.length;
+      var ib = priority.indexOf(b); if(ib===-1) ib = 999 + priority.length;
+      if(ia !== ib) return ia - ib;
+      return a.localeCompare(b, 'fr', {numeric:true, sensitivity:'base'});
+    });
+  }
+
   window.toggleGroup = function(gKey){
     state.expandedGroups[gKey] = !state.expandedGroups[gKey];
     render();
@@ -1121,7 +1155,7 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     section.columns.forEach(function(col){
       var val = existingEntry ? (existingEntry[col.key]||'') : '';
       html += '<label>' + escapeHtml(col.label) + (col.role==='title'?' *':'') + '</label>';
-      if(col.role === 'group'){
+      if(col.role === 'group' || col.role === 'subgroup'){
         // Liste déroulante avec autocomplétion : choisir une valeur existante
         // (pour bien se classer dans le bon menu déroulant) ou taper un nouveau nom.
         var seen = {};
@@ -1236,15 +1270,14 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     } else {
       var groupCol = getGroupColumn(section);
       if(groupCol){
+        var subCol = getSubgroupColumn(section);
         var groups = {};
         filtered.forEach(function(entry){
           var gv = entry[groupCol.key] || '(Non classé)';
           if(!groups[gv]) groups[gv] = [];
           groups[gv].push(entry);
         });
-        var groupNames = Object.keys(groups).sort(function(a,b){
-          return a.localeCompare(b, 'fr', {numeric:true, sensitivity:'base'});
-        });
+        var groupNames = sortGroupNames(section.id, Object.keys(groups));
         var hasSearch = !!term;
         groupNames.forEach(function(gv){
           var gKey = groupStateKey(section.id, gv);
@@ -1257,9 +1290,45 @@ html,body{ margin:0; padding:0; background:var(--bg); }
             '</div>';
           if(isOpen){
             body += '<div class="group-entries">';
-            sortEntriesAlpha(section, groups[gv]).forEach(function(entry){
-              body += renderEntryCard(section, entry);
-            });
+            if(subCol){
+              var subGroups = {};
+              groups[gv].forEach(function(entry){
+                var sv = entry[subCol.key] || '(Non classé)';
+                if(!subGroups[sv]) subGroups[sv] = [];
+                subGroups[sv].push(entry);
+              });
+              var subNames = Object.keys(subGroups);
+              if(subNames.length <= 1){
+                // Un seul site dans cette ville : pas besoin de sous-menu,
+                // on affiche les lignes directement.
+                sortEntriesAlpha(section, groups[gv]).forEach(function(entry){
+                  body += renderEntryCard(section, entry);
+                });
+              } else {
+                subNames.sort(function(a,b){ return a.localeCompare(b, 'fr', {numeric:true, sensitivity:'base'}); });
+                subNames.forEach(function(sv){
+                  var sKey = subgroupStateKey(section.id, gv, sv);
+                  var isSubOpen = hasSearch ? true : !!state.expandedGroups[sKey];
+                  var sKeySafe = sKey.replace(/'/g,"\\'");
+                  body += '<div class="group-header subgroup-header" onclick="toggleGroup(\'' + sKeySafe + '\')">' +
+                    '<span class="group-arrow">' + (isSubOpen ? '▾' : '▸') + '</span>' +
+                    '<span class="group-name">' + escapeHtml(sv) + '</span>' +
+                    '<span class="group-count">' + subGroups[sv].length + '</span>' +
+                    '</div>';
+                  if(isSubOpen){
+                    body += '<div class="group-entries">';
+                    sortEntriesAlpha(section, subGroups[sv]).forEach(function(entry){
+                      body += renderEntryCard(section, entry);
+                    });
+                    body += '</div>';
+                  }
+                });
+              }
+            } else {
+              sortEntriesAlpha(section, groups[gv]).forEach(function(entry){
+                body += renderEntryCard(section, entry);
+              });
+            }
             body += '</div>';
           }
         });

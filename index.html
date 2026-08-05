@@ -142,6 +142,44 @@ html,body{ margin:0; padding:0; background:var(--bg); }
   margin-bottom:6px;
 }
 
+.repfax .group-header{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:13px 16px;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+  background:var(--surface-2);
+  user-select:none;
+}
+.repfax .group-header:hover{ background:#2a3040; }
+.repfax .group-arrow{
+  font-family:var(--font-mono);
+  color:var(--amber);
+  font-size:0.8rem;
+  width:14px;
+  flex-shrink:0;
+}
+.repfax .group-name{
+  flex:1;
+  font-weight:600;
+  font-size:0.9rem;
+  color:var(--text);
+}
+.repfax .group-count{
+  font-family:var(--font-mono);
+  font-size:0.72rem;
+  color:var(--text-muted);
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:2px 7px;
+  flex-shrink:0;
+}
+.repfax .group-entries{
+  background:var(--bg);
+}
+
 .repfax .entry-card{
   display:flex;
   align-items:flex-start;
@@ -306,8 +344,8 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     "id": "fax",
     "label": "FAX",
     "columns": [
-      { "key": "site", "label": "Site", "role": "title" },
-      { "key": "unit", "label": "Étage / Unité", "role": "meta" },
+      { "key": "site", "label": "Site", "role": "group" },
+      { "key": "unit", "label": "Étage / Unité", "role": "title" },
       { "key": "value", "label": "Fax", "role": "value" },
       { "key": "notes", "label": "Notes", "role": "notes" }
     ],
@@ -488,7 +526,7 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     "label": "Code géographiques Estrie",
     "columns": [
       { "key": "secteur", "label": "Municipalité / secteur", "role": "title" },
-      { "key": "region", "label": "Région administrative / zone", "role": "meta" },
+      { "key": "region", "label": "Région administrative / zone", "role": "group" },
       { "key": "code_geo", "label": "Code géographique", "role": "value" },
       { "key": "notes", "label": "Notes", "role": "notes" }
     ],
@@ -617,7 +655,7 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     "label": "RPA (40)",
     "columns": [
       { "key": "nom", "label": "Nom de la résidence", "role": "title" },
-      { "key": "ville", "label": "Ville", "role": "meta" },
+      { "key": "ville", "label": "Ville", "role": "group" },
       { "key": "adresse", "label": "Adresse", "role": "meta" },
       { "key": "zone", "label": "No de zone", "role": "meta" },
       { "key": "code_geo", "label": "Code géo", "role": "value" },
@@ -694,7 +732,7 @@ html,body{ margin:0; padding:0; background:var(--bg); }
   },
   {
     "id": "autres_codes",
-    "label": "Autres codes",
+    "label": "Code de PEC-DEST",
     "columns": [
       { "key": "description", "label": "Description", "role": "title" },
       { "key": "categorie", "label": "Catégorie", "role": "meta" },
@@ -734,6 +772,7 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     search:'',
     mode:null,
     confirmingDelete:null,
+    expandedGroups:{},
     syncStatus:'connecting' // connecting | live | error
   };
 
@@ -797,6 +836,26 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     return changed;
   }
 
+  // Met à jour la structure des colonnes (rôles title/group/meta/value/notes)
+  // pour les données déjà en ligne, SANS toucher aux entrées existantes.
+  // Permet de faire évoluer l'affichage (ex: ajout de regroupements) sans
+  // jamais perdre les lignes déjà ajoutées par l'équipe.
+  function migrateColumnDefs(sections){
+    var changed = false;
+    sections.forEach(function(s){
+      var seedMatch = null;
+      for(var i=0;i<SEED_SECTIONS.length;i++) if(SEED_SECTIONS[i].id===s.id) seedMatch = SEED_SECTIONS[i];
+      if(seedMatch){
+        var same = JSON.stringify(s.columns) === JSON.stringify(seedMatch.columns);
+        if(!same){
+          s.columns = JSON.parse(JSON.stringify(seedMatch.columns));
+          changed = true;
+        }
+      }
+    });
+    return changed;
+  }
+
   var initializing = false;
   var suppressNextRemoteRender = false;
 
@@ -821,6 +880,7 @@ html,body{ margin:0; padding:0; background:var(--bg); }
       var needsSave = false;
       if(migrateAreaCodes(sections)) needsSave = true;
       if(migrateSectionLabels(sections)) needsSave = true;
+      if(migrateColumnDefs(sections)) needsSave = true;
 
       state.sections = sections;
       state.loaded = true;
@@ -866,6 +926,15 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     for(var i=0;i<section.entries.length;i++) if(section.entries[i].id===entryId) return section.entries[i];
     return null;
   }
+  function getGroupColumn(section){
+    var cols = section.columns.filter(function(c){ return c.role==='group'; });
+    return cols.length ? cols[0] : null;
+  }
+  function groupStateKey(sectionId, groupValue){ return sectionId + '::' + groupValue; }
+  window.toggleGroup = function(gKey){
+    state.expandedGroups[gKey] = !state.expandedGroups[gKey];
+    render();
+  };
 
   window.switchTab = function(id){
     state.activeId = id;
@@ -970,6 +1039,21 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     return false;
   }
 
+  // Trie les entrées par ordre alphabétique sur leur colonne "title"
+  // (ou la première colonne disponible si aucune n'est marquée "title").
+  function sortEntriesAlpha(section, entries){
+    var titleCol = section.columns.filter(function(c){ return c.role==='title'; })[0];
+    var sortKey = titleCol ? titleCol.key : (section.columns[0] ? section.columns[0].key : null);
+    if(!sortKey) return entries;
+    var copy = entries.slice();
+    copy.sort(function(a,b){
+      var av = (a[sortKey]||'').toString();
+      var bv = (b[sortKey]||'').toString();
+      return av.localeCompare(bv, 'fr', {numeric:true, sensitivity:'base'});
+    });
+    return copy;
+  }
+
   function renderForm(section, existingEntry){
     var html = '<div class="inline-form">';
     section.columns.forEach(function(col){
@@ -1061,9 +1145,40 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     } else if(filtered.length===0){
       body += '<div class="section-empty">Aucun résultat pour "' + escapeHtml(state.search) + '" dans cet onglet.</div>';
     } else {
-      filtered.forEach(function(entry){
-        body += renderEntryCard(section, entry);
-      });
+      var groupCol = getGroupColumn(section);
+      if(groupCol){
+        var groups = {};
+        filtered.forEach(function(entry){
+          var gv = entry[groupCol.key] || '(Non classé)';
+          if(!groups[gv]) groups[gv] = [];
+          groups[gv].push(entry);
+        });
+        var groupNames = Object.keys(groups).sort(function(a,b){
+          return a.localeCompare(b, 'fr', {numeric:true, sensitivity:'base'});
+        });
+        var hasSearch = !!term;
+        groupNames.forEach(function(gv){
+          var gKey = groupStateKey(section.id, gv);
+          var isOpen = hasSearch ? true : !!state.expandedGroups[gKey];
+          var gKeySafe = gKey.replace(/'/g,"\\'");
+          body += '<div class="group-header" onclick="toggleGroup(\'' + gKeySafe + '\')">' +
+            '<span class="group-arrow">' + (isOpen ? '▾' : '▸') + '</span>' +
+            '<span class="group-name">' + escapeHtml(gv) + '</span>' +
+            '<span class="group-count">' + groups[gv].length + '</span>' +
+            '</div>';
+          if(isOpen){
+            body += '<div class="group-entries">';
+            sortEntriesAlpha(section, groups[gv]).forEach(function(entry){
+              body += renderEntryCard(section, entry);
+            });
+            body += '</div>';
+          }
+        });
+      } else {
+        sortEntriesAlpha(section, filtered).forEach(function(entry){
+          body += renderEntryCard(section, entry);
+        });
+      }
     }
     if(state.mode && state.mode.type==='add'){
       body += renderForm(section, null);

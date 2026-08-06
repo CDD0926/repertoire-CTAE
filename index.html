@@ -983,17 +983,19 @@ html,body{ margin:0; padding:0; background:var(--bg); }
         // serait sauvegardée.
         db.runTransaction(function(transaction){
           return transaction.get(docRef).then(function(freshSnap){
-            var freshData = freshSnap.exists ? freshSnap.data() : null;
-            var freshSections = (freshData && freshData.sections)
-              ? freshData.sections
-              : JSON.parse(JSON.stringify(SEED_SECTIONS));
+            if(!freshSnap.exists || !freshSnap.data() || !freshSnap.data().sections){
+              // Même principe que persistEntryChange : ne jamais repartir
+              // du SEED ici, on annule simplement cette écriture.
+              throw new Error('DOC_MISSING_LORS_DE_LA_MIGRATION');
+            }
+            var freshSections = JSON.parse(JSON.stringify(freshSnap.data().sections));
             var stillNeeded = runAllMigrations(freshSections);
             if(stillNeeded){
               transaction.set(docRef, { sections: freshSections });
             }
             return freshSections;
           });
-        }).catch(function(e){ /* silencieux, retentera plus tard */ });
+        }).catch(function(e){ console.error(e); /* on retentera au prochain chargement */ });
       }
     }, function(err){
       console.error(err);
@@ -1025,9 +1027,14 @@ html,body{ margin:0; padding:0; background:var(--bg); }
   function persistEntryChange(mutatorFn){
     return db.runTransaction(function(transaction){
       return transaction.get(docRef).then(function(docSnap){
-        var sections = (docSnap.exists && docSnap.data() && docSnap.data().sections)
-          ? JSON.parse(JSON.stringify(docSnap.data().sections))
-          : JSON.parse(JSON.stringify(SEED_SECTIONS));
+        if(!docSnap.exists || !docSnap.data() || !docSnap.data().sections){
+          // IMPORTANT : ne jamais repartir des données de départ (SEED)
+          // pendant une modification — ça effacerait tout ce que l'équipe
+          // a déjà ajouté. On préfère annuler cette écriture et avertir
+          // la personne plutôt que de risquer d'écraser des données réelles.
+          throw new Error('DOC_MISSING_LORS_DE_LA_MODIFICATION');
+        }
+        var sections = JSON.parse(JSON.stringify(docSnap.data().sections));
         mutatorFn(sections);
         transaction.set(docRef, { sections: sections });
         return sections;

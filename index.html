@@ -990,6 +990,29 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     }
   }
 
+  // Applique un seul changement (ajout / modif / suppression d'une ligne)
+  // via une transaction Firestore : lit toujours la version la PLUS RÉCENTE
+  // du document au moment de l'écriture, applique le changement dessus,
+  // puis sauvegarde. Si deux personnes modifient en même temps, Firestore
+  // réessaie automatiquement pour que les deux changements survivent,
+  // au lieu que l'un écrase l'autre.
+  function persistEntryChange(mutatorFn){
+    return db.runTransaction(function(transaction){
+      return transaction.get(docRef).then(function(docSnap){
+        var sections = (docSnap.exists && docSnap.data() && docSnap.data().sections)
+          ? JSON.parse(JSON.stringify(docSnap.data().sections))
+          : JSON.parse(JSON.stringify(SEED_SECTIONS));
+        mutatorFn(sections);
+        transaction.set(docRef, { sections: sections });
+        return sections;
+      });
+    }).then(function(sections){
+      // Met à jour l'affichage local avec le résultat exact de la transaction
+      state.sections = sections;
+      return sections;
+    });
+  }
+
   function getSection(id){
     for(var i=0;i<state.sections.length;i++) if(state.sections[i].id===id) return state.sections[i];
     return null;
@@ -1072,6 +1095,7 @@ html,body{ margin:0; padding:0; background:var(--bg); }
   };
 
   window.submitForm = async function(){
+    var sectionId = state.activeId;
     var section = getActive();
     var data = {};
     section.columns.forEach(function(col){
@@ -1083,22 +1107,34 @@ html,body{ margin:0; padding:0; background:var(--bg); }
       showToast('Le champ "' + titleCol.label + '" est requis');
       return;
     }
-    var wasAdd = state.mode.type==='add';
-    if(wasAdd){
-      data.id = genId();
-      section.entries.push(data);
-    } else {
-      var entry = findEntry(section, state.mode.entryId);
-      if(entry){
-        section.columns.forEach(function(col){ entry[col.key] = data[col.key]; });
-      }
-    }
-    state.mode=null;
+    var mode = state.mode;
+    state.mode = null;
     render();
     try{
-      await persist();
+      await persistEntryChange(function(sections){
+        var sec = sections.filter(function(s){ return s.id===sectionId; })[0];
+        if(!sec) return;
+        if(mode.type === 'add'){
+          data.id = genId();
+          sec.entries.push(data);
+        } else {
+          var entry = sec.entries.filter(function(e){ return e.id===mode.entryId; })[0];
+          if(entry){
+            sec.columns.forEach(function(col){ entry[col.key] = data[col.key]; });
+          } else {
+            // L'entrée a peut-être été supprimée par quelqu'un d'autre entre-temps :
+            // on la recrée avec les données saisies plutôt que de perdre le changement.
+            data.id = mode.entryId;
+            sec.entries.push(data);
+          }
+        }
+      });
+      render();
       showToast('Sauvegardé');
-    }catch(e){ /* toast déjà affiché par persist() */ }
+    }catch(e){
+      console.error(e);
+      showToast("Erreur d'enregistrement — réessaie");
+    }
   };
 
   window.askDelete = function(entryId){
@@ -1116,14 +1152,21 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     }, 3000);
   };
   async function doDelete(entryId){
-    var section = getActive();
-    section.entries = section.entries.filter(function(e){ return e.id!==entryId; });
+    var sectionId = state.activeId;
     state.confirmingDelete=null;
     render();
     try{
-      await persist();
+      await persistEntryChange(function(sections){
+        var sec = sections.filter(function(s){ return s.id===sectionId; })[0];
+        if(!sec) return;
+        sec.entries = sec.entries.filter(function(e){ return e.id!==entryId; });
+      });
+      render();
       showToast('Supprimé');
-    }catch(e){ /* toast déjà affiché */ }
+    }catch(e){
+      console.error(e);
+      showToast("Erreur d'enregistrement — réessaie");
+    }
   }
 
   function entryMatches(section, entry, term){

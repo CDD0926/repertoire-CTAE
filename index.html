@@ -925,6 +925,22 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     return changed;
   }
 
+  // Applique toutes les migrations connues sur un tableau "sections" donné
+  // et retourne true si au moins une a modifié quelque chose. Centralisé
+  // ici pour pouvoir être ré-exécuté sur la version la plus fraîche des
+  // données au moment précis de l'écriture (voir la transaction ci-dessous).
+  function runAllMigrations(sections){
+    var needsSave = false;
+    if(migrateAreaCodes(sections)) needsSave = true;
+    if(migrateHospitalNames(sections)) needsSave = true;
+    if(migrateMagogZoneLabel(sections)) needsSave = true;
+    if(migrateSectionLabels(sections)) needsSave = true;
+    if(migrateColumnDefs(sections)) needsSave = true;
+    if(migrateFieldFromSeed(sections, 'code_etablissement', 'ville')) needsSave = true;
+    if(migrateFieldFromSeed(sections, 'fax', 'ville')) needsSave = true;
+    return needsSave;
+  }
+
   var initializing = false;
   var suppressNextRemoteRender = false;
 
@@ -946,14 +962,7 @@ html,body{ margin:0; padding:0; background:var(--bg); }
       var data = snap.data();
       var sections = (data && data.sections) ? data.sections : SEED_SECTIONS;
 
-      var needsSave = false;
-      if(migrateAreaCodes(sections)) needsSave = true;
-      if(migrateHospitalNames(sections)) needsSave = true;
-      if(migrateMagogZoneLabel(sections)) needsSave = true;
-      if(migrateSectionLabels(sections)) needsSave = true;
-      if(migrateColumnDefs(sections)) needsSave = true;
-      if(migrateFieldFromSeed(sections, 'code_etablissement', 'ville')) needsSave = true;
-      if(migrateFieldFromSeed(sections, 'fax', 'ville')) needsSave = true;
+      var needsSave = runAllMigrations(sections);
 
       state.sections = sections;
       state.loaded = true;
@@ -967,7 +976,24 @@ html,body{ margin:0; padding:0; background:var(--bg); }
       }
 
       if(needsSave){
-        docRef.set({ sections: state.sections }).catch(function(e){ /* silencieux, retentera plus tard */ });
+        // Écriture protégée par transaction : on relit toujours la version
+        // la plus fraîche avant d'appliquer les migrations et d'écrire,
+        // pour ne jamais écraser un ajout fait par quelqu'un d'autre
+        // entre le moment où cette copie a été lue et celui où elle
+        // serait sauvegardée.
+        db.runTransaction(function(transaction){
+          return transaction.get(docRef).then(function(freshSnap){
+            var freshData = freshSnap.exists ? freshSnap.data() : null;
+            var freshSections = (freshData && freshData.sections)
+              ? freshData.sections
+              : JSON.parse(JSON.stringify(SEED_SECTIONS));
+            var stillNeeded = runAllMigrations(freshSections);
+            if(stillNeeded){
+              transaction.set(docRef, { sections: freshSections });
+            }
+            return freshSections;
+          });
+        }).catch(function(e){ /* silencieux, retentera plus tard */ });
       }
     }, function(err){
       console.error(err);

@@ -335,7 +335,8 @@ html,body{ margin:0; padding:0; background:var(--bg); }
   };
   firebase.initializeApp(firebaseConfig);
   var db = firebase.firestore();
-  var docRef = db.collection('repertoireFax').doc('main');
+  var docRef = db.collection('repertoireFax').doc('main'); // ancien format (lecture seule, pour transfert unique)
+  var entriesCol = db.collection('repertoireEntries'); // nouveau format : une ligne = un document
 
   // Cache local (IndexedDB) : les visites suivantes sur ce même appareil
   // affichent les données instantanément depuis le cache, puis se
@@ -818,153 +819,174 @@ html,body{ margin:0; padding:0; background:var(--bg); }
   }
   window.copyValueEl = function(value){ copyValue(value); };
 
-  // ---- Migrations (appliquées une fois au chargement initial si nécessaire) ----
+  // ---- Corrections historiques de données (appliquées UNE SEULE FOIS,
+  // lors du transfert depuis l'ancien format vers le nouveau ci-dessous) ----
   function migrateAreaCodes(sections){
-    var changed = false;
     var fax = null;
     for(var i=0;i<sections.length;i++) if(sections[i].id==='fax') fax = sections[i];
-    if(!fax) return changed;
-    var targets = ['Fleurimont', 'Hôtel-Dieu (HD)'];
+    if(!fax) return;
+    var targets = ['Fleurimont', 'Hôtel-Dieu (HD)', 'CHUS – Hôpital Fleurimont', 'CHUS – Hôtel-Dieu'];
     fax.entries.forEach(function(e){
       if(targets.indexOf(e.site)!==-1 && e.value && e.value.indexOf('819-')!==0){
         e.value = '819-' + e.value;
-        changed = true;
       }
     });
-    return changed;
   }
 
-  function migrateSectionLabels(sections){
-    var changed = false;
-    sections.forEach(function(s){
-      var seedMatch = null;
-      for(var i=0;i<SEED_SECTIONS.length;i++) if(SEED_SECTIONS[i].id===s.id) seedMatch = SEED_SECTIONS[i];
-      if(seedMatch && seedMatch.label !== s.label){
-        s.label = seedMatch.label;
-        changed = true;
-      }
-    });
-    return changed;
-  }
-
-  // Met à jour la structure des colonnes (rôles title/group/meta/value/notes)
-  // pour les données déjà en ligne, SANS toucher aux entrées existantes.
-  // Permet de faire évoluer l'affichage (ex: ajout de regroupements) sans
-  // jamais perdre les lignes déjà ajoutées par l'équipe.
-  function migrateColumnDefs(sections){
-    var changed = false;
-    sections.forEach(function(s){
-      var seedMatch = null;
-      for(var i=0;i<SEED_SECTIONS.length;i++) if(SEED_SECTIONS[i].id===s.id) seedMatch = SEED_SECTIONS[i];
-      if(seedMatch){
-        var same = JSON.stringify(s.columns) === JSON.stringify(seedMatch.columns);
-        if(!same){
-          s.columns = JSON.parse(JSON.stringify(seedMatch.columns));
-          changed = true;
-        }
-      }
-    });
-    return changed;
-  }
-
-  // Renomme les sites de fax déjà en ligne vers les noms complets
-  // (ex: "Fleurimont" -> "CHUS – Hôpital Fleurimont"), sans toucher
-  // aux autres champs (unit, value, notes restent intacts).
   function migrateHospitalNames(sections){
-    var changed = false;
     var fax = null;
     for(var i=0;i<sections.length;i++) if(sections[i].id==='fax') fax = sections[i];
-    if(!fax) return changed;
+    if(!fax) return;
     var renames = {
       'Fleurimont': 'CHUS – Hôpital Fleurimont',
       'Hôtel-Dieu (HD)': 'CHUS – Hôtel-Dieu'
     };
     fax.entries.forEach(function(e){
-      if(renames[e.site]){
-        e.site = renames[e.site];
-        changed = true;
-      }
+      if(renames[e.site]) e.site = renames[e.site];
     });
-    return changed;
   }
 
-  // Corrige le libellé de zone "505/520 - Magog" -> "505 - Magog"
-  // (la zone 520 n'existe pas séparément, c'est bien juste la 505).
   function migrateMagogZoneLabel(sections){
-    var changed = false;
     var geo = null;
     for(var i=0;i<sections.length;i++) if(sections[i].id==='code_geo_estrie') geo = sections[i];
-    if(!geo) return changed;
+    if(!geo) return;
     geo.entries.forEach(function(e){
-      if(e.region === '505/520 - Magog'){
-        e.region = '505 - Magog';
-        changed = true;
-      }
+      if(e.region === '505/520 - Magog') e.region = '505 - Magog';
     });
-    return changed;
   }
 
-  // Copie un champ depuis SEED_SECTIONS (en faisant correspondre les "id")
-  // vers les entrées déjà en ligne qui ne l'ont pas encore, sans écraser
-  // les entrées existantes ni en perdre aucune. Utilisé ici pour ajouter
-  // automatiquement la ville de chaque établissement déjà en ligne.
   function migrateFieldFromSeed(sections, sectionId, fieldKey){
-    var changed = false;
     var section = null, seedSection = null;
     for(var i=0;i<sections.length;i++) if(sections[i].id===sectionId) section = sections[i];
     for(var j=0;j<SEED_SECTIONS.length;j++) if(SEED_SECTIONS[j].id===sectionId) seedSection = SEED_SECTIONS[j];
-    if(!section || !seedSection) return changed;
+    if(!section || !seedSection) return;
     var seedById = {};
     seedSection.entries.forEach(function(e){ seedById[e.id] = e; });
     section.entries.forEach(function(e){
       if(!e[fieldKey] && seedById[e.id] && seedById[e.id][fieldKey]){
         e[fieldKey] = seedById[e.id][fieldKey];
-        changed = true;
       }
     });
-    return changed;
   }
 
-  // Applique toutes les migrations connues sur un tableau "sections" donné
-  // et retourne true si au moins une a modifié quelque chose. Centralisé
-  // ici pour pouvoir être ré-exécuté sur la version la plus fraîche des
-  // données au moment précis de l'écriture (voir la transaction ci-dessous).
-  function runAllMigrations(sections){
-    var needsSave = false;
-    if(migrateAreaCodes(sections)) needsSave = true;
-    if(migrateHospitalNames(sections)) needsSave = true;
-    if(migrateMagogZoneLabel(sections)) needsSave = true;
-    if(migrateSectionLabels(sections)) needsSave = true;
-    if(migrateColumnDefs(sections)) needsSave = true;
-    if(migrateFieldFromSeed(sections, 'code_etablissement', 'ville')) needsSave = true;
-    if(migrateFieldFromSeed(sections, 'fax', 'ville')) needsSave = true;
-    return needsSave;
+  // Applique toutes les corrections historiques connues sur un tableau
+  // "sections" (structure ancien format) avant de le transférer vers le
+  // nouveau format un-document-par-ligne.
+  function applyHistoricalFixups(sections){
+    migrateAreaCodes(sections);
+    migrateHospitalNames(sections);
+    migrateMagogZoneLabel(sections);
+    migrateFieldFromSeed(sections, 'code_etablissement', 'ville');
+    migrateFieldFromSeed(sections, 'fax', 'ville');
+    return sections;
   }
+
+  // ---- NOUVELLE ARCHITECTURE : une ligne = un document Firestore ----
+  //
+  // Avant : toutes les données vivaient dans UN SEUL document, et chaque
+  // ajout/modif devait relire-modifier-réécrire ce document au complet.
+  // Risque : si quelqu'un (même avec une vieille copie de l'app restée
+  // ouverte) écrivait en même temps, ça pouvait écraser les ajouts des
+  // autres.
+  //
+  // Maintenant : chaque ligne (fax, RPA, établissement, etc.) est son
+  // propre document dans la collection "repertoireEntries", identifié par
+  // son id et taggé avec sectionId (quel onglet il appartient à). Ajouter
+  // une ligne = créer un document. Modifier = ne touche que ce document.
+  // Supprimer = ne supprime que ce document. AUCUNE lecture préalable de
+  // "tout le reste" n'est jamais nécessaire, donc structurellement
+  // impossible qu'un changement en écrase un autre, peu importe combien
+  // de personnes (ou de vieux onglets oubliés) sont actifs en même temps.
+  //
+  // La structure des onglets/colonnes (labels, ordre, regroupements) n'est
+  // JAMAIS stockée dans Firestore : elle vit uniquement dans ce fichier
+  // JS. Donc dès qu'on publie une nouvelle version du fichier, tout le
+  // monde a instantanément la bonne structure sans aucune écriture de
+  // migration nécessaire.
 
   var initializing = false;
-  var suppressNextRemoteRender = false;
+
+  function sectionMetaOnly(){
+    return SEED_SECTIONS.map(function(s){
+      return { id: s.id, label: s.label, columns: s.columns };
+    });
+  }
+
+  function buildSectionsFromEntries(entriesBySectionId){
+    return sectionMetaOnly().map(function(meta){
+      meta.entries = entriesBySectionId[meta.id] || [];
+      return meta;
+    });
+  }
+
+  // Écrit une liste de {ref, data} par lots de 450 (limite Firestore : 500
+  // opérations par batch) pour rester sûr même avec un grand volume de données.
+  function commitInChunks(items){
+    var chunkSize = 450;
+    var chunks = [];
+    for(var i=0;i<items.length;i+=chunkSize){ chunks.push(items.slice(i, i+chunkSize)); }
+    return chunks.reduce(function(chain, chunk){
+      return chain.then(function(){
+        var batch = db.batch();
+        chunk.forEach(function(item){ batch.set(item.ref, item.data); });
+        return batch.commit();
+      });
+    }, Promise.resolve());
+  }
+
+  // Transfert unique : copie les données de l'ANCIEN document (si présentes)
+  // ou, à défaut, des données de départ (SEED) vers la NOUVELLE collection
+  // (une ligne = un document). Les id utilisés sont déterministes
+  // (sectionId + '-' + id original), donc même si plusieurs personnes
+  // déclenchent ce transfert en même temps par accident, c'est sans risque
+  // : elles écrivent toutes le même contenu au même endroit.
+  function migrateOldDocToEntriesCollection(){
+    return docRef.get().then(function(oldSnap){
+      var oldData = oldSnap.exists ? oldSnap.data() : null;
+      var sourceSections = (oldData && oldData.sections && oldData.sections.length)
+        ? JSON.parse(JSON.stringify(oldData.sections))
+        : JSON.parse(JSON.stringify(SEED_SECTIONS));
+      applyHistoricalFixups(sourceSections);
+      var items = [];
+      sourceSections.forEach(function(sec){
+        (sec.entries || []).forEach(function(entry){
+          var stableId = sec.id + '-' + entry.id;
+          var docData = Object.assign({}, entry);
+          delete docData.id;
+          docData.sectionId = sec.id;
+          items.push({ ref: entriesCol.doc(stableId), data: docData });
+        });
+      });
+      return commitInChunks(items);
+    });
+  }
 
   // ---- Chargement + écoute temps réel Firestore ----
   function startListening(){
-    docRef.onSnapshot(function(snap){
-      if(!snap.exists){
-        // Première utilisation : personne n'a encore initialisé la base
+    entriesCol.onSnapshot(function(snap){
+      if(snap.empty){
         if(!initializing){
           initializing = true;
-          docRef.set({ sections: SEED_SECTIONS }).catch(function(err){
+          migrateOldDocToEntriesCollection().catch(function(err){
             console.error(err);
             state.syncStatus = 'error';
             render();
           });
         }
-        return;
+        return; // le listener se redéclenchera dès que le transfert sera écrit
       }
-      var data = snap.data();
-      var sections = (data && data.sections) ? data.sections : SEED_SECTIONS;
+      var bySection = {};
+      snap.forEach(function(doc){
+        var d = doc.data();
+        var sid = d.sectionId;
+        var entry = Object.assign({}, d);
+        delete entry.sectionId;
+        entry.id = doc.id;
+        if(!bySection[sid]) bySection[sid] = [];
+        bySection[sid].push(entry);
+      });
 
-      var needsSave = runAllMigrations(sections);
-
-      state.sections = sections;
+      state.sections = buildSectionsFromEntries(bySection);
       state.loaded = true;
       state.syncStatus = 'live';
       state.loadError = null;
@@ -974,75 +996,15 @@ html,body{ margin:0; padding:0; background:var(--bg); }
       } else {
         renderTabBar();
       }
-
-      if(needsSave){
-        // Écriture protégée par transaction : on relit toujours la version
-        // la plus fraîche avant d'appliquer les migrations et d'écrire,
-        // pour ne jamais écraser un ajout fait par quelqu'un d'autre
-        // entre le moment où cette copie a été lue et celui où elle
-        // serait sauvegardée.
-        db.runTransaction(function(transaction){
-          return transaction.get(docRef).then(function(freshSnap){
-            if(!freshSnap.exists || !freshSnap.data() || !freshSnap.data().sections){
-              // Même principe que persistEntryChange : ne jamais repartir
-              // du SEED ici, on annule simplement cette écriture.
-              throw new Error('DOC_MISSING_LORS_DE_LA_MIGRATION');
-            }
-            var freshSections = JSON.parse(JSON.stringify(freshSnap.data().sections));
-            var stillNeeded = runAllMigrations(freshSections);
-            if(stillNeeded){
-              transaction.set(docRef, { sections: freshSections });
-            }
-            return freshSections;
-          });
-        }).catch(function(e){ console.error(e); /* on retentera au prochain chargement */ });
-      }
     }, function(err){
       console.error(err);
       state.syncStatus = 'error';
       state.loadError = "Connexion au répertoire partagé impossible. Vérifie ta connexion internet.";
       if(!state.loaded){
-        state.sections = SEED_SECTIONS;
+        state.sections = buildSectionsFromEntries({});
         state.loaded = true;
       }
       render();
-    });
-  }
-
-  async function persist(){
-    try{
-      await docRef.set({ sections: state.sections });
-    }catch(e){
-      showToast("Erreur d'enregistrement — réessaie");
-      throw e;
-    }
-  }
-
-  // Applique un seul changement (ajout / modif / suppression d'une ligne)
-  // via une transaction Firestore : lit toujours la version la PLUS RÉCENTE
-  // du document au moment de l'écriture, applique le changement dessus,
-  // puis sauvegarde. Si deux personnes modifient en même temps, Firestore
-  // réessaie automatiquement pour que les deux changements survivent,
-  // au lieu que l'un écrase l'autre.
-  function persistEntryChange(mutatorFn){
-    return db.runTransaction(function(transaction){
-      return transaction.get(docRef).then(function(docSnap){
-        if(!docSnap.exists || !docSnap.data() || !docSnap.data().sections){
-          // IMPORTANT : ne jamais repartir des données de départ (SEED)
-          // pendant une modification — ça effacerait tout ce que l'équipe
-          // a déjà ajouté. On préfère annuler cette écriture et avertir
-          // la personne plutôt que de risquer d'écraser des données réelles.
-          throw new Error('DOC_MISSING_LORS_DE_LA_MODIFICATION');
-        }
-        var sections = JSON.parse(JSON.stringify(docSnap.data().sections));
-        mutatorFn(sections);
-        transaction.set(docRef, { sections: sections });
-        return sections;
-      });
-    }).then(function(sections){
-      // Met à jour l'affichage local avec le résultat exact de la transaction
-      state.sections = sections;
-      return sections;
     });
   }
 
@@ -1144,25 +1106,12 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     state.mode = null;
     render();
     try{
-      await persistEntryChange(function(sections){
-        var sec = sections.filter(function(s){ return s.id===sectionId; })[0];
-        if(!sec) return;
-        if(mode.type === 'add'){
-          data.id = genId();
-          sec.entries.push(data);
-        } else {
-          var entry = sec.entries.filter(function(e){ return e.id===mode.entryId; })[0];
-          if(entry){
-            sec.columns.forEach(function(col){ entry[col.key] = data[col.key]; });
-          } else {
-            // L'entrée a peut-être été supprimée par quelqu'un d'autre entre-temps :
-            // on la recrée avec les données saisies plutôt que de perdre le changement.
-            data.id = mode.entryId;
-            sec.entries.push(data);
-          }
-        }
-      });
-      render();
+      data.sectionId = sectionId;
+      var entryId = (mode.type === 'add') ? genId() : mode.entryId;
+      // Écrit UNIQUEMENT ce document précis — ne lit et ne touche à rien
+      // d'autre. Impossible que ça affecte les lignes de quelqu'un d'autre,
+      // peu importe qui écrit en même temps ou quelle version du code il utilise.
+      await entriesCol.doc(entryId).set(data);
       showToast('Sauvegardé');
     }catch(e){
       console.error(e);
@@ -1185,16 +1134,11 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     }, 3000);
   };
   async function doDelete(entryId){
-    var sectionId = state.activeId;
     state.confirmingDelete=null;
     render();
     try{
-      await persistEntryChange(function(sections){
-        var sec = sections.filter(function(s){ return s.id===sectionId; })[0];
-        if(!sec) return;
-        sec.entries = sec.entries.filter(function(e){ return e.id!==entryId; });
-      });
-      render();
+      // Supprime UNIQUEMENT ce document précis.
+      await entriesCol.doc(entryId).delete();
       showToast('Supprimé');
     }catch(e){
       console.error(e);

@@ -319,6 +319,9 @@ html,body{ margin:0; padding:0; background:var(--bg); }
   <div id="status-area"></div>
   <main id="section-container"></main>
   <p class="footer-hint">Tape sur une valeur pour la copier. ✎ pour corriger, ✕ pour supprimer, + pour ajouter une ligne. Liste partagée en temps réel : tes collègues voient tes ajouts et corrections dès qu'ils les font, et toi les leurs.</p>
+  <div style="text-align:center; padding:14px 20px 0;">
+    <button class="btn ghost" onclick="exportBackup()" style="font-size:0.75rem;">📥 Exporter une sauvegarde (JSON)</button>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -405,13 +408,14 @@ html,body{ margin:0; padding:0; background:var(--bg); }
     "label": "Code d'entrée",
     "columns": [
       { "key": "site", "label": "Site", "role": "title" },
+      { "key": "ville", "label": "Ville", "role": "group" },
       { "key": "desc", "label": "Description", "role": "meta" },
       { "key": "value", "label": "Code", "role": "value" },
       { "key": "notes", "label": "Notes", "role": "notes" }
     ],
     "entries": [
-      { "id": "c1", "site": "Victoriaville", "desc": "Porte d'entrée", "value": "4321*", "notes": "" },
-      { "id": "c2", "site": "CHU Sainte-Justine", "desc": "Garage", "value": "6700", "notes": "" }
+      { "id": "c1", "site": "Victoriaville", "ville": "Victoriaville", "desc": "Porte d'entrée", "value": "4321*", "notes": "" },
+      { "id": "c2", "site": "CHU Sainte-Justine", "ville": "Montréal", "desc": "Garage", "value": "6700", "notes": "" }
     ]
   },
   {
@@ -819,6 +823,42 @@ html,body{ margin:0; padding:0; background:var(--bg); }
   }
   window.copyValueEl = function(value){ copyValue(value); };
 
+  // Récupère les données les plus fraîches directement depuis Firestore
+  // (pas juste ce qui est affiché à l'écran) et déclenche le téléchargement
+  // d'un fichier JSON — utile comme sauvegarde manuelle, ou pour renvoyer
+  // un instantané des données actuelles.
+  window.exportBackup = async function(){
+    try{
+      showToast("Préparation de l'export...");
+      var snap = await entriesCol.get();
+      var bySection = {};
+      snap.forEach(function(doc){
+        var d = doc.data();
+        var sid = d.sectionId;
+        var entry = Object.assign({}, d);
+        delete entry.sectionId;
+        entry.id = doc.id;
+        if(!bySection[sid]) bySection[sid] = [];
+        bySection[sid].push(entry);
+      });
+      var sections = buildSectionsFromEntries(bySection);
+      var blob = new Blob([JSON.stringify(sections, null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      var today = new Date().toISOString().slice(0,10);
+      a.href = url;
+      a.download = 'repertoire-fax-sauvegarde-' + today + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Export téléchargé');
+    }catch(e){
+      console.error(e);
+      showToast("Erreur lors de l'export — réessaie");
+    }
+  };
+
   // ---- Corrections historiques de données (appliquées UNE SEULE FOIS,
   // lors du transfert depuis l'ancien format vers le nouveau ci-dessous) ----
   function migrateAreaCodes(sections){
@@ -906,6 +946,32 @@ html,body{ margin:0; padding:0; background:var(--bg); }
 
   var initializing = false;
 
+  // Table de correspondance site -> ville pour "Code d'entrée", utilisée
+  // uniquement pour compléter automatiquement les lignes déjà en ligne
+  // qui n'ont pas encore de champ "ville" (créées avant son ajout).
+  var CODE_ENTREE_VILLE_MAP = {
+    'Victoriaville': 'Victoriaville',
+    'CHU Sainte-Justine': 'Montréal'
+  };
+
+  // Complète un champ manquant sur des documents déjà existants, un par
+  // un, via une simple mise à jour ciblée. Comme chaque ligne est son
+  // propre document (nouvelle architecture), ça ne touche jamais à rien
+  // d'autre — sans danger, même exécuté plusieurs fois ou par plusieurs
+  // personnes en même temps (idempotent : une fois le champ rempli, plus
+  // rien à faire au prochain passage).
+  function backfillMissingGroupField(sectionId, fieldKey, lookupMap, lookupKey){
+    var sec = getSection(sectionId);
+    if(!sec) return;
+    sec.entries.forEach(function(entry){
+      if(!entry[fieldKey] && lookupMap[entry[lookupKey]]){
+        var patch = {};
+        patch[fieldKey] = lookupMap[entry[lookupKey]];
+        entriesCol.doc(entry.id).update(patch).catch(function(e){ console.error(e); });
+      }
+    });
+  }
+
   function sectionMetaOnly(){
     return SEED_SECTIONS.map(function(s){
       return { id: s.id, label: s.label, columns: s.columns };
@@ -991,6 +1057,8 @@ html,body{ margin:0; padding:0; background:var(--bg); }
       state.syncStatus = 'live';
       state.loadError = null;
 
+      backfillMissingGroupField('code_entree', 'ville', CODE_ENTREE_VILLE_MAP, 'site');
+
       if(!state.mode){
         render();
       } else {
@@ -1031,6 +1099,20 @@ html,body{ margin:0; padding:0; background:var(--bg); }
   // Ordre de priorité personnalisé pour certains onglets : les valeurs
   // listées ici apparaissent en premier dans cet ordre précis, puis tout
   // le reste suit en ordre alphabétique.
+  // Alias : certaines valeurs différentes doivent former UN SEUL groupe
+  // à l'affichage (ex: quelqu'un tape "MTL" au lieu de "Montréal"). La
+  // valeur brute reste inchangée dans la donnée, seul l'affichage/regroupement
+  // est unifié vers la forme canonique.
+  var GROUP_ALIASES = {
+    'mtl': 'Montréal',
+    'montreal': 'Montréal'
+  };
+  function normalizeGroupValue(v){
+    if(!v) return v;
+    var key = v.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return GROUP_ALIASES[key] || v;
+  }
+
   var GROUP_PRIORITY = {
     'code_etablissement': ['Sherbrooke', 'Magog', 'East Angus', 'Richmond', 'Valcourt', 'Stanstead'],
     'fax': ['Sherbrooke']
@@ -1240,7 +1322,7 @@ html,body{ margin:0; padding:0; background:var(--bg); }
   // Ordre personnalisé des onglets (du plus utilisé au moins utilisé).
   // Les sections non listées ici (ex: nouvel onglet futur) apparaissent
   // à la fin, dans l'ordre où elles existent.
-  var TAB_ORDER = ['code_etablissement', 'fax', 'code_geo_estrie', 'rpa', 'code_entree', 'police', 'autres_codes'];
+  var TAB_ORDER = ['code_entree', 'code_etablissement', 'fax', 'code_geo_estrie', 'rpa', 'police', 'autres_codes'];
 
   function renderTabBar(){
     var html='';
@@ -1293,7 +1375,7 @@ html,body{ margin:0; padding:0; background:var(--bg); }
         var subCol = getSubgroupColumn(section);
         var groups = {};
         filtered.forEach(function(entry){
-          var gv = entry[groupCol.key] || '(Non classé)';
+          var gv = normalizeGroupValue(entry[groupCol.key]) || '(Non classé)';
           if(!groups[gv]) groups[gv] = [];
           groups[gv].push(entry);
         });
